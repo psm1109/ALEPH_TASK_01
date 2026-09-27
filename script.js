@@ -1,4 +1,4 @@
-import { browserSupportsPasskeys } from '@simplewebauthn/browser';
+import { browserSupportsWebAuthn } from '@simplewebauthn/browser';
 import { requestJson, runPasskeyCeremony, shouldStartPasskeyRegistration } from './passkey-client.js';
 
 const closeAllDetails = document.querySelector('.close-all-details');
@@ -236,7 +236,7 @@ logoutButton.addEventListener('click', async () => {
   }
 });
 
-const supportsPasskeys = await browserSupportsPasskeys();
+const supportsPasskeys = browserSupportsWebAuthn();
 
 if (!supportsPasskeys) {
   loginButton.disabled = true;

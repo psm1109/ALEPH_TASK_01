@@ -154,3 +154,13 @@ test('패스키가 없을 때 열기 동작은 같은 페이지 등록 ceremony�
   assert.equal(shouldStartPasskeyRegistration(true), true);
   assert.equal(shouldStartPasskeyRegistration(false), false);
 });
+
+test('패스키 UI는 추가 capability가 아닌 WebAuthn API 지원 여부로 활성화한다', async () => {
+  const mainSource = await readFile(new URL('../script.js', import.meta.url), 'utf8');
+  const setupSource = await readFile(new URL('../setup.js', import.meta.url), 'utf8');
+
+  for (const source of [mainSource, setupSource]) {
+    assert.equal(source.includes('browserSupportsWebAuthn'), true);
+    assert.equal(source.includes('browserSupportsPasskeys'), false);
+  }
+});
