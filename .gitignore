@@ -1,4 +1,9 @@
 # Browser verification captures generated during local checks
-/T01/screen-*.png
+/screen-*.png
 /pdf-preview.png
-/T01/images/*.png
+/images/*.png
+
+# Local Neon credentials and installed dependencies
+/.env.local
+/.neon
+/node_modules/
