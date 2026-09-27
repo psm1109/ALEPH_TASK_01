@@ -6,7 +6,7 @@
 2. 지원하려는 곳 목록
 3. 스스로 쓰는 회고
 
-실제 개인 내용은 Git 파일이 아니라 Neon의 `private_items`에만 입력합니다. `db/schema.sql`은 처음 구조를 확인할 수 있는 자리표시자만 만듭니다.
+실제 개인 내용은 Git 파일이 아니라 Neon의 `passkey_private_items`에만 입력합니다. `db/schema.sql`은 처음 구조를 확인할 수 있는 자리표시자만 만듭니다. 기존 `private_items`는 계정 기반 자료가 있는 별도 테이블이므로 패스키 공간에서 사용하지 않습니다.
 
 ## 화면 경계
 

@@ -13,7 +13,7 @@ export default async function handler(request, response) {
     const sql = getSql();
     const items = await sql`
       SELECT id, category, title, body, updated_at
-      FROM private_items
+      FROM passkey_private_items
       ORDER BY sort_order ASC, id ASC
     `;
     sendJson(response, 200, { items });

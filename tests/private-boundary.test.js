@@ -97,6 +97,15 @@ test('비인증 페이지 응답용 빌드 결과에 비공개 항목 내용이 
   }
 });
 
+test('패스키 자료는 기존 계정 자료와 분리된 전용 테이블에서만 읽는다', async () => {
+  const handlerSource = await readFile(new URL('../api/private-items.js', import.meta.url), 'utf8');
+  const schemaSource = await readFile(new URL('../db/schema.sql', import.meta.url), 'utf8');
+
+  assert.equal(handlerSource.includes('FROM passkey_private_items'), true);
+  assert.equal(handlerSource.includes('FROM private_items'), false);
+  assert.equal(schemaSource.includes('CREATE TABLE IF NOT EXISTS passkey_private_items'), true);
+});
+
 test('공개 잠금 패널에는 별도 등록 버튼을 노출하지 않고 같은 페이지 등록 대화상자를 둔다', async () => {
   const source = await readFile(new URL('../index.html', import.meta.url), 'utf8');
   const setupSource = await readFile(new URL('../setup/index.html', import.meta.url), 'utf8');

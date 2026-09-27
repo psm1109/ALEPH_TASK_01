@@ -3,7 +3,7 @@
 ## 기준 상태
 
 - 현재 브랜치: `t08/passkey`
-- 기준 커밋(현재 HEAD): `69e74219f7cacbeb6d6490759d600796a5cbba8a`
+- 기준 커밋(현재 HEAD): `0b7a76304ecf9c20bbee6f347ac9cefe04666c0f`
 - 커밋 상태: 이번 변경은 아직 커밋하지 않음
 - 작업 트리: 패스키 비공개 공간 구현 파일이 수정·추가된 상태
 
@@ -19,6 +19,9 @@
 - SimpleWebAuthn 등록·인증 옵션/검증 API, 서명된 `HttpOnly` 세션 쿠키, 로그아웃 API를 추가했습니다.
 - 최초 패스키 등록은 32자 이상의 `PASSKEY_SETUP_SECRET` 또는 이미 인증된 세션이 있어야 가능합니다.
 - `SESSION_SECRET`이 없을 때 credential 저장이나 인증 카운터 갱신까지 진행된 뒤 실패하던 순서를 수정했습니다. 이제 등록·인증 옵션 발급 단계에서 `503`으로 중단해 모바일과 Neon 사이에 불완전한 상태가 생기지 않게 합니다.
+- 운영 `/api/private-items`의 500 원인은 API가 조회한 `updated_at` 컬럼이 기존 `private_items`에 없기 때문임을 Neon 메타데이터 조회로 확인했습니다.
+- 기존 `private_items`에는 UUID `account_id` 기준 2개 계정·6개 행이 있어 단순 호환 조회 시 다른 계정 자료까지 노출될 수 있으므로, 해당 테이블은 수정하지 않고 패스키 공간 전용 `passkey_private_items`로 분리했습니다.
+- 운영에 적용할 수 있도록 `db/migrations/20260928_create_passkey_private_items.sql`과 레거시 제거용 `db/migrations/20260928_remove_legacy_passkey_tables.sql`을 추가했습니다. 두 변경은 운영 Neon에 실행했고, 전용 테이블에 자리표시자 3행이 생성된 것을 확인했습니다.
 - Neon에 패스키 credential, 5분짜리 일회용 챌린지, 비공개 항목을 저장하는 `db/schema.sql`을 추가했습니다.
 - 비공개 항목은 준비 중인 프로젝트 메모, 지원하려는 곳 목록, 스스로 쓰는 회고의 세 종류로 정했습니다.
 - 비인증 비공개 API는 DB 접속 전에 `401`, 등록 권한이 없으면 `403`을 반환하도록 만들었습니다.
@@ -33,7 +36,7 @@
 - `api/passkey/*.js`: 등록·인증·상태 확인·로그아웃 Vercel 함수
 - `api/private-items.js`: 세션 확인 뒤에만 Neon 자료를 반환하는 API
 - `api/_lib/*.js`: DB, 챌린지, 설정, HTTP 응답, 세션 공통 모듈
-- `db/schema.sql`: Neon 스키마와 안전한 초기 자리표시자
+- `db/schema.sql`, `db/migrations/*.sql`: Neon 스키마, 전용 비공개 테이블, 안전한 초기 자리표시자와 레거시 테이블 정리
 - `tests/private-boundary.test.js`: 401/403, 캐시 금지, 공개 빌드 누출 검사
 - `docs/card1/public-private-boundary.png`: 데스크톱 잠금 화면 캡처
 - `docs/card1/unauthenticated-private-response.json`: 비인증 응답 계약 캡처
@@ -47,7 +50,7 @@
 - `npm test`
   - Vite 7.3.6 프로덕션 빌드 성공
   - 기존 학습 이미지 6장 모두 빌드 산출물에 포함됨
-  - Node 테스트 9개 통과, 실패 0개
+  - Node 테스트 10개 통과, 실패 0개
   - 비인증 `/api/private-items` 응답 `401` 및 본문 확인
   - 권한 없는 패스키 등록 응답 `403` 확인
   - 공개 `dist/index.html`과 번들 JS에 세 비공개 항목 문구가 없음을 확인
@@ -56,6 +59,7 @@
   - 최초 설정 코드 재사용 `409` 정책과 추가 등록의 인증 세션 요구 확인
   - credential이 없을 때 `패스키로 열기`가 같은 페이지의 등록 ceremony를 시작하는 분기 확인
   - `SESSION_SECRET` 누락 시 credential 생성 전에 `503`으로 중단하는 회귀 검사 확인
+  - 패스키 자료 API가 기존 계정 자료 테이블이 아닌 `passkey_private_items`만 읽는지 확인
 - `node --check`를 `api/**/*.js` 전체에 실행: 모두 통과
 - `node`로 `package.json`, `vercel.json` JSON 파싱: 통과
 - `git diff --check`: 오류 없음(CRLF 변환 경고만 있음)
@@ -68,7 +72,7 @@
 
 ## 아직 확인하지 못한 항목
 
-- 실제 Neon 프로젝트에 `db/schema.sql`을 실행하지 않았습니다.
+- 전체 `db/schema.sql`을 운영 Neon에 다시 실행하지는 않았지만, 이번 변경에 필요한 전용 테이블 생성·자리표시자 삽입·레거시 테이블 제거 마이그레이션은 실행했습니다.
 - 실제 Vercel 환경변수를 등록하거나 배포하지 않았습니다.
 - 운영 도메인의 RP ID/Origin에서 Windows Hello, Touch ID 또는 보안 키로 등록·로그인하지 않았습니다.
 - Windows Hello·휴대폰·패스키 관리자 선택 창과 credential 저장은 정적 preview에서 실행하지 못했습니다.
@@ -78,10 +82,11 @@
 ### 운영에서 확인한 상태
 
 - `https://aleph-task-t01.vercel.app/api/passkey/status`를 읽기 전용으로 확인한 결과 `registrationAvailable: false`였습니다. 모바일뿐 아니라 Neon에도 첫 credential이 남아 있으므로, 삭제보다 `SESSION_SECRET` 등록·재배포 후 기존 패스키 인증을 먼저 시도해야 합니다.
+- 로컬 `.env.local`의 Neon 연결로 값이 아닌 메타데이터만 조회한 뒤, 기존 `private_items`와 연결된 레거시 `passkey_accounts`, `passkeys`, `passkey_challenges`, `passkey_sessions`를 외부 의존성 없이 제거했습니다. 새 `passkey_private_items`에는 자리표시자 3행이 있습니다.
 
 ## 다음 작업자가 바로 실행할 순서
 
-1. Neon SQL Editor에서 `db/schema.sql`을 실행합니다.
+1. Vercel에 이 변경을 배포해 `/api/private-items`가 `passkey_private_items`를 읽도록 합니다.
 2. Vercel에 `.env.example`의 환경변수를 실제 값으로 설정합니다. 비밀값은 로그나 문서에 남기지 않습니다.
 3. Vercel에 배포한 뒤 운영 URL과 `PASSKEY_RP_ID`, `PASSKEY_ORIGIN`이 정확히 일치하는지 확인합니다.
 4. 공개 화면의 `패스키로 열기`를 눌러 같은 페이지의 일회용 소유자 확인을 마친 뒤 Windows Hello 또는 휴대폰 저장 위치가 바로 열리는지 확인하고, 로그아웃 → 패스키 로그인을 검증합니다. `/setup`은 예비 경로로만 확인합니다.

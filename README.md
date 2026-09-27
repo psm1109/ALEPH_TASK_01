@@ -68,7 +68,7 @@ CBOR_NATIVE_ACCELERATION_DISABLED=true
 
 `SESSION_SECRET`이 없거나 32자 미만이면 등록·인증 옵션 API가 `503`을 반환하며 WebAuthn ceremony를 시작하지 않습니다. 모바일에 패스키를 만든 뒤 세션 발급만 실패하는 불완전한 등록을 막기 위한 사전 검사이므로, 반드시 첫 등록 전에 설정하고 재배포해야 합니다.
 
-Neon SQL Editor에서 `db/schema.sql`을 먼저 실행합니다. 이 SQL은 패스키 자격 증명, 5분짜리 일회용 챌린지, 비공개 항목 테이블을 만들고 세 종류의 자리표시자를 넣습니다. 실제 프로젝트·지원·회고 내용은 공개 Git 파일이 아닌 Neon에서 수정합니다.
+Neon SQL Editor에서 `db/schema.sql`을 먼저 실행합니다. 이 SQL은 패스키 자격 증명, 5분짜리 일회용 챌린지, 패스키 전용 `passkey_private_items` 테이블을 만들고 세 종류의 자리표시자를 넣습니다. 실제 프로젝트·지원·회고 내용은 공개 Git 파일이 아닌 이 전용 테이블에서 수정합니다. 기존 `private_items`는 다른 계정 자료와 충돌할 수 있으므로 읽거나 수정하지 않습니다.
 
 ```powershell
 npm test
