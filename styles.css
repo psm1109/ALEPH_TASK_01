@@ -120,6 +120,21 @@ button { font:inherit; cursor:pointer; }
 .setup-message { min-height:1.6em; margin:18px 0 0; color:#236953; }
 .setup-message.is-error { color:#a33636; }
 .setup-back { display:inline-block; margin-top:22px; }
+.passkey-bootstrap-dialog { width:min(520px,calc(100% - 32px)); padding:0; border:0; border-radius:20px; color:var(--ink); box-shadow:0 28px 90px #0e1728aa; }
+.passkey-bootstrap-dialog::backdrop { background:#101827b8; backdrop-filter:blur(4px); }
+.passkey-bootstrap-form { position:relative; display:grid; gap:14px; padding:clamp(24px,5vw,40px); background:#fff; }
+.passkey-bootstrap-form h2,.passkey-bootstrap-form p { margin:0; }
+.passkey-bootstrap-form>p:not(.private-eyebrow):not(.passkey-dialog-message) { color:var(--muted); word-break:keep-all; }
+.passkey-bootstrap-form label { margin-top:8px; font-weight:700; }
+.passkey-bootstrap-form input { min-height:48px; padding:10px 12px; border:1px solid #bac5d4; border-radius:10px; font:inherit; }
+.passkey-dialog-close { position:absolute; top:16px; right:16px; width:40px; height:40px; border:0; border-radius:50%; background:transparent; color:var(--muted); font-size:1.5rem; line-height:1; }
+.passkey-dialog-close:hover { background:#edf1f7; }
+.passkey-dialog-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:8px; }
+.passkey-dialog-actions button { min-height:44px; padding:0 16px; border:1px solid #c7d0dc; border-radius:10px; background:#fff; color:var(--ink); font-weight:700; }
+.passkey-dialog-actions button[type="submit"] { border-color:#53364a; background:#53364a; color:#fff; }
+.passkey-dialog-actions button:disabled { cursor:not-allowed; opacity:.55; }
+.passkey-dialog-message { min-height:1.6em; color:#236953; font-size:.9rem; }
+.passkey-dialog-message.is-error { color:#a33636; }
 footer { width:min(1320px,calc(100% - 48px)); margin:auto; padding:16px 0 24px; border-top:1px solid var(--ink); display:flex; justify-content:space-between; font-size:.85rem; } footer p { margin:0; }
 .gallery-modal { position:fixed; z-index:30; inset:0; display:grid; place-items:center; padding:24px; }
 .gallery-modal[hidden] { display:none; }
@@ -201,4 +216,6 @@ summary:focus-visible { outline:3px solid var(--focus); outline-offset:3px; }
   .setup-page { width:min(100% - 32px,760px); padding:24px 0; }
   .setup-form { grid-template-columns:1fr; }
   .setup-form label,.setup-form>p { grid-column:auto; }
+  .passkey-dialog-actions { flex-direction:column-reverse; }
+  .passkey-dialog-actions button { width:100%; }
 }

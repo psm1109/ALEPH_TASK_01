@@ -1,5 +1,5 @@
 import { browserSupportsPasskeys } from '@simplewebauthn/browser';
-import { getPasskeyEntryRoute, requestJson, runPasskeyCeremony } from './passkey-client.js';
+import { requestJson, runPasskeyCeremony, shouldStartPasskeyRegistration } from './passkey-client.js';
 
 const closeAllDetails = document.querySelector('.close-all-details');
 const understandingItems = document.querySelectorAll('#work-style .understanding-item');
@@ -97,6 +97,12 @@ const privateMessage = document.querySelector('[data-private-message]');
 const loginButton = document.querySelector('[data-passkey-login]');
 const logoutButton = document.querySelector('[data-passkey-logout]');
 const addPasskeyButton = document.querySelector('[data-passkey-add]');
+const bootstrapDialog = document.querySelector('[data-passkey-bootstrap-dialog]');
+const bootstrapForm = document.querySelector('[data-passkey-bootstrap-form]');
+const bootstrapCodeInput = document.querySelector('[data-passkey-bootstrap-code]');
+const bootstrapSubmitButton = document.querySelector('[data-passkey-bootstrap-submit]');
+const bootstrapMessage = document.querySelector('[data-passkey-bootstrap-message]');
+const bootstrapCancelButtons = document.querySelectorAll('[data-passkey-bootstrap-cancel]');
 
 const setPrivateMessage = (message, isError = false) => {
   privateMessage.textContent = message;
@@ -143,15 +149,58 @@ const loadPrivateItems = async ({ quiet = false } = {}) => {
   }
 };
 
+const setBootstrapMessage = (message, isError = false) => {
+  bootstrapMessage.textContent = message;
+  bootstrapMessage.classList.toggle('is-error', isError);
+};
+
+const openBootstrapDialog = () => {
+  setBootstrapMessage('');
+  bootstrapDialog.showModal();
+  bootstrapCodeInput.focus();
+};
+
+bootstrapCancelButtons.forEach((button) => button.addEventListener('click', () => {
+  bootstrapCodeInput.value = '';
+  bootstrapDialog.close();
+}));
+
+bootstrapDialog.addEventListener('close', () => {
+  bootstrapCodeInput.value = '';
+  bootstrapSubmitButton.disabled = false;
+});
+
+bootstrapForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const setupCode = bootstrapCodeInput.value;
+  if (!setupCode) {
+    setBootstrapMessage('일회용 설정 코드를 입력해 주세요.', true);
+    bootstrapCodeInput.focus();
+    return;
+  }
+
+  bootstrapSubmitButton.disabled = true;
+  setBootstrapMessage('Windows의 패스키 저장 위치 선택 창을 여는 중입니다.');
+  try {
+    await runPasskeyCeremony('register', setupCode);
+    bootstrapDialog.close();
+    await loadPrivateItems();
+    setPrivateMessage('첫 패스키를 등록하고 비공개 기록을 열었습니다.');
+  } catch (error) {
+    setBootstrapMessage(error.message, true);
+  } finally {
+    bootstrapSubmitButton.disabled = false;
+  }
+});
+
 loginButton.addEventListener('click', async () => {
   loginButton.disabled = true;
   setPrivateMessage('패스키 등록 상태를 확인하고 있습니다.');
   try {
     const { registrationAvailable } = await requestJson('/api/passkey/status', { method: 'GET' });
-    const setupRoute = getPasskeyEntryRoute(registrationAvailable);
-    if (setupRoute) {
-      setPrivateMessage('첫 패스키 등록 화면으로 이동합니다.');
-      window.location.assign(setupRoute);
+    if (shouldStartPasskeyRegistration(registrationAvailable)) {
+      setPrivateMessage('첫 패스키를 등록해 주세요.');
+      openBootstrapDialog();
       return;
     }
 

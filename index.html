@@ -253,6 +253,22 @@
 
     </main>
 
+    <dialog class="passkey-bootstrap-dialog" data-passkey-bootstrap-dialog aria-labelledby="passkey-bootstrap-title">
+      <form class="passkey-bootstrap-form" data-passkey-bootstrap-form>
+        <button class="passkey-dialog-close" type="button" data-passkey-bootstrap-cancel aria-label="닫기">×</button>
+        <p class="private-eyebrow">ONE-TIME OWNER CHECK</p>
+        <h2 id="passkey-bootstrap-title">첫 패스키 등록</h2>
+        <p>최초 소유자 확인 후 Windows가 패스키 저장 위치 선택 창을 바로 엽니다.</p>
+        <label for="bootstrap-setup-code">일회용 설정 코드</label>
+        <input id="bootstrap-setup-code" name="bootstrap-setup-code" type="password" autocomplete="one-time-code" data-passkey-bootstrap-code />
+        <div class="passkey-dialog-actions">
+          <button type="button" data-passkey-bootstrap-cancel>취소</button>
+          <button type="submit" data-passkey-bootstrap-submit>패스키 등록 계속</button>
+        </div>
+        <p class="passkey-dialog-message" data-passkey-bootstrap-message role="status" aria-live="polite"></p>
+      </form>
+    </dialog>
+
     <div class="gallery-modal" id="learning-gallery" role="dialog" aria-modal="true" aria-labelledby="gallery-title" aria-describedby="gallery-caption" hidden>
       <div class="gallery-backdrop" data-gallery-close></div>
       <section class="gallery-dialog">
