@@ -1,4 +1,4 @@
-import { browserSupportsPasskeys } from '@simplewebauthn/browser';
+import { browserSupportsWebAuthn } from '@simplewebauthn/browser';
 import { requestJson, runPasskeyCeremony } from './passkey-client.js';
 
 const setupForm = document.querySelector('[data-setup-form]');
@@ -49,7 +49,7 @@ setupRegisterButton.addEventListener('click', async () => {
   }
 });
 
-if (await browserSupportsPasskeys()) {
+if (browserSupportsWebAuthn()) {
   loadSetupStatus();
 } else {
   setupRegisterButton.disabled = true;
