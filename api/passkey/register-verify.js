@@ -4,7 +4,7 @@ import { getPasskeyConfig } from '../_lib/config.js';
 import { getSql } from '../_lib/db.js';
 import { logServerError, methodAllowed, readJsonBody, sendJson } from '../_lib/http.js';
 import { getRegistrationAccess } from '../_lib/registration-access.js';
-import { createSessionCookie, hasSetupAccess, hasValidSession } from '../_lib/session.js';
+import { createSessionCookie, hasSetupAccess, hasValidSession, isSessionConfigured } from '../_lib/session.js';
 
 export default async function handler(request, response) {
   if (!methodAllowed(request, response, 'POST')) return;
@@ -13,6 +13,10 @@ export default async function handler(request, response) {
   const initialAccess = getRegistrationAccess({ sessionAuthorized, setupAuthorized, hasCredential: false });
   if (!initialAccess.allowed) {
     sendJson(response, initialAccess.status, { error: initialAccess.error });
+    return;
+  }
+  if (!isSessionConfigured()) {
+    sendJson(response, 503, { error: '서버 세션 설정이 완료되지 않았습니다.' });
     return;
   }
 

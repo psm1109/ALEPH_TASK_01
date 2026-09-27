@@ -66,6 +66,8 @@ CBOR_NATIVE_ACCELERATION_DISABLED=true
 
 `PASSKEY_SETUP_SECRET`와 `SESSION_SECRET`은 서로 다른 32자 이상의 무작위 값이어야 합니다. `PASSKEY_RP_ID`는 스킴 없는 배포 호스트, `PASSKEY_ORIGIN`은 `https://`를 포함한 정확한 배포 Origin으로 설정합니다. 예시 형식은 `.env.example`에서 확인할 수 있습니다.
 
+`SESSION_SECRET`이 없거나 32자 미만이면 등록·인증 옵션 API가 `503`을 반환하며 WebAuthn ceremony를 시작하지 않습니다. 모바일에 패스키를 만든 뒤 세션 발급만 실패하는 불완전한 등록을 막기 위한 사전 검사이므로, 반드시 첫 등록 전에 설정하고 재배포해야 합니다.
+
 Neon SQL Editor에서 `db/schema.sql`을 먼저 실행합니다. 이 SQL은 패스키 자격 증명, 5분짜리 일회용 챌린지, 비공개 항목 테이블을 만들고 세 종류의 자리표시자를 넣습니다. 실제 프로젝트·지원·회고 내용은 공개 Git 파일이 아닌 Neon에서 수정합니다.
 
 ```powershell

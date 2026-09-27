@@ -3,6 +3,10 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 const COOKIE_NAME = '__Host-private_session';
 const SESSION_SECONDS = 60 * 60 * 8;
 
+export function isSessionConfigured() {
+  return typeof process.env.SESSION_SECRET === 'string' && process.env.SESSION_SECRET.length >= 32;
+}
+
 function sign(value, secret) {
   return createHmac('sha256', secret).update(value).digest('base64url');
 }
@@ -25,7 +29,7 @@ function getCookies(request) {
 
 export function createSessionCookie() {
   const secret = process.env.SESSION_SECRET;
-  if (!secret || secret.length < 32) throw new Error('SESSION_SECRET must be at least 32 characters');
+  if (!isSessionConfigured()) throw new Error('SESSION_SECRET must be at least 32 characters');
 
   const encodedPayload = Buffer.from(JSON.stringify({
     sub: 'owner',

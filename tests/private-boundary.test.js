@@ -56,6 +56,31 @@ test('권한 없는 패스키 등록 요청은 DB 접속 전에 403으로 거절
   assert.deepEqual(JSON.parse(response.body), { error: '패스키 등록 권한이 없습니다.' });
 });
 
+test('세션 비밀값이 없으면 credential 생성 전에 503으로 중단한다', async () => {
+  const originalSetupSecret = process.env.PASSKEY_SETUP_SECRET;
+  const originalSessionSecret = process.env.SESSION_SECRET;
+  const setupSecret = 'test-only-bootstrap-secret-value-1234567890';
+  process.env.PASSKEY_SETUP_SECRET = setupSecret;
+  delete process.env.SESSION_SECRET;
+
+  try {
+    const request = {
+      method: 'POST',
+      headers: { 'x-passkey-setup-secret': setupSecret },
+    };
+    const response = createResponse();
+    await registerOptionsHandler(request, response);
+
+    assert.equal(response.statusCode, 503);
+    assert.deepEqual(JSON.parse(response.body), { error: '서버 세션 설정이 완료되지 않았습니다.' });
+  } finally {
+    if (originalSetupSecret === undefined) delete process.env.PASSKEY_SETUP_SECRET;
+    else process.env.PASSKEY_SETUP_SECRET = originalSetupSecret;
+    if (originalSessionSecret === undefined) delete process.env.SESSION_SECRET;
+    else process.env.SESSION_SECRET = originalSessionSecret;
+  }
+});
+
 test('비인증 페이지 응답용 빌드 결과에 비공개 항목 내용이 포함되지 않는다', async () => {
   const index = await readFile(new URL('../dist/index.html', import.meta.url), 'utf8');
   const assetsDirectory = new URL('../dist/assets/', import.meta.url);

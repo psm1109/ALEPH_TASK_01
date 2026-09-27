@@ -3,10 +3,14 @@ import { consumeChallenge } from '../_lib/challenges.js';
 import { getPasskeyConfig } from '../_lib/config.js';
 import { getSql } from '../_lib/db.js';
 import { logServerError, methodAllowed, readJsonBody, sendJson } from '../_lib/http.js';
-import { createSessionCookie } from '../_lib/session.js';
+import { createSessionCookie, isSessionConfigured } from '../_lib/session.js';
 
 export default async function handler(request, response) {
   if (!methodAllowed(request, response, 'POST')) return;
+  if (!isSessionConfigured()) {
+    sendJson(response, 503, { error: '서버 세션 설정이 완료되지 않았습니다.' });
+    return;
+  }
 
   try {
     const { ceremonyId, credential } = readJsonBody(request);
