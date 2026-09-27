@@ -15,9 +15,7 @@ export default async function handler(request, response) {
   try {
     const sql = getSql();
     const config = getPasskeyConfig();
-    const credentials = await sql`
-      SELECT credential_id, transports FROM passkey_credentials ORDER BY created_at ASC
-    `;
+    const credentials = await sql`SELECT 1 FROM passkey_credentials LIMIT 1`;
     if (credentials.length === 0) {
       sendJson(response, 409, { error: '등록된 패스키가 없습니다.' });
       return;
@@ -26,10 +24,6 @@ export default async function handler(request, response) {
     const options = await generateAuthenticationOptions({
       rpID: config.rpID,
       userVerification: 'required',
-      allowCredentials: credentials.map((credential) => ({
-        id: credential.credential_id,
-        transports: credential.transports,
-      })),
     });
     const ceremonyId = await saveChallenge('authentication', options.challenge);
     sendJson(response, 200, { options, ceremonyId });

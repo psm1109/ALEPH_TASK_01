@@ -164,3 +164,10 @@ test('패스키 UI는 추가 capability가 아닌 WebAuthn API 지원 여부로 
     assert.equal(source.includes('browserSupportsPasskeys'), false);
   }
 });
+
+test('패스키 인증은 저장 당시 transport로 인증 기기를 제한하지 않는다', async () => {
+  const source = await readFile(new URL('../api/passkey/authenticate-options.js', import.meta.url), 'utf8');
+
+  assert.equal(source.includes('allowCredentials'), false);
+  assert.equal(source.includes("userVerification: 'required'"), true);
+});
