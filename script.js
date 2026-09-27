@@ -1,8 +1,5 @@
-import {
-  browserSupportsWebAuthn,
-  startAuthentication,
-  startRegistration,
-} from '@simplewebauthn/browser';
+import { browserSupportsPasskeys } from '@simplewebauthn/browser';
+import { requestJson, runPasskeyCeremony } from './passkey-client.js';
 
 const closeAllDetails = document.querySelector('.close-all-details');
 const understandingItems = document.querySelectorAll('#work-style .understanding-item');
@@ -99,26 +96,7 @@ const privateItems = document.querySelector('[data-private-items]');
 const privateMessage = document.querySelector('[data-private-message]');
 const loginButton = document.querySelector('[data-passkey-login]');
 const logoutButton = document.querySelector('[data-passkey-logout]');
-const registerButton = document.querySelector('[data-passkey-register]');
-const setupSecretInput = document.querySelector('[data-setup-secret]');
-
-const requestJson = async (url, options = {}) => {
-  const response = await fetch(url, {
-    ...options,
-    credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const error = new Error(payload.error || '요청을 처리하지 못했습니다.');
-    error.status = response.status;
-    throw error;
-  }
-  return payload;
-};
+const addPasskeyButton = document.querySelector('[data-passkey-add]');
 
 const setPrivateMessage = (message, isError = false) => {
   privateMessage.textContent = message;
@@ -165,25 +143,6 @@ const loadPrivateItems = async ({ quiet = false } = {}) => {
   }
 };
 
-const runPasskeyCeremony = async (kind, setupSecret = '') => {
-  const isRegistration = kind === 'register';
-  const prefix = isRegistration ? 'register' : 'authenticate';
-  const headers = setupSecret ? { 'X-Passkey-Setup-Secret': setupSecret } : {};
-  const { options, ceremonyId } = await requestJson(`/api/passkey/${prefix}-options`, {
-    method: 'POST',
-    headers,
-    body: '{}',
-  });
-  const credential = isRegistration
-    ? await startRegistration({ optionsJSON: options })
-    : await startAuthentication({ optionsJSON: options });
-  await requestJson(`/api/passkey/${prefix}-verify`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ ceremonyId, credential }),
-  });
-};
-
 loginButton.addEventListener('click', async () => {
   loginButton.disabled = true;
   setPrivateMessage('패스키를 확인하고 있습니다.');
@@ -197,24 +156,16 @@ loginButton.addEventListener('click', async () => {
   }
 });
 
-registerButton.addEventListener('click', async () => {
-  const setupSecret = setupSecretInput.value;
-  if (!setupSecret) {
-    setPrivateMessage('설정 비밀값을 입력해 주세요.', true);
-    setupSecretInput.focus();
-    return;
-  }
-
-  registerButton.disabled = true;
+addPasskeyButton.addEventListener('click', async () => {
+  addPasskeyButton.disabled = true;
   setPrivateMessage('새 패스키를 등록하고 있습니다.');
   try {
-    await runPasskeyCeremony('register', setupSecret);
-    setupSecretInput.value = '';
-    await loadPrivateItems();
+    await runPasskeyCeremony('register');
+    setPrivateMessage('새 패스키를 추가했습니다.');
   } catch (error) {
     setPrivateMessage(error.message, true);
   } finally {
-    registerButton.disabled = false;
+    addPasskeyButton.disabled = false;
   }
 });
 
@@ -227,9 +178,11 @@ logoutButton.addEventListener('click', async () => {
   }
 });
 
-if (!browserSupportsWebAuthn()) {
+const supportsPasskeys = await browserSupportsPasskeys();
+
+if (!supportsPasskeys) {
   loginButton.disabled = true;
-  registerButton.disabled = true;
+  addPasskeyButton.disabled = true;
   setPrivateMessage('이 브라우저에서는 패스키를 사용할 수 없습니다.', true);
 } else {
   loadPrivateItems({ quiet: true });

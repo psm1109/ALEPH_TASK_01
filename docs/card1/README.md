@@ -14,6 +14,8 @@
 
 화면 증거: `public-private-boundary.png`
 
+최초 패스키 등록의 일회용 설정 코드는 공개 잠금 패널에서 제거하고 `/setup` 경로로 분리했습니다. 첫 credential이 생긴 뒤에는 설정 코드 등록을 서버에서도 거절하며, 추가 패스키는 인증된 비공개 공간에서만 등록합니다.
+
 ## 비인증 서버 응답
 
 비인증 요청의 캡처 본문은 `unauthenticated-private-response.json`에 있습니다. `tests/private-boundary.test.js`가 동일 핸들러를 쿠키 없이 호출해 다음을 검증합니다.

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { test } from 'node:test';
+import { getRegistrationAccess } from '../api/_lib/registration-access.js';
 import privateItemsHandler from '../api/private-items.js';
 import registerOptionsHandler from '../api/passkey/register-options.js';
 
@@ -70,9 +71,43 @@ test('비인증 페이지 응답용 빌드 결과에 비공개 항목 내용이 
   }
 });
 
+test('공개 잠금 패널에는 최초 설정 코드 입력을 노출하지 않는다', async () => {
+  const source = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const setupSource = await readFile(new URL('../setup/index.html', import.meta.url), 'utf8');
+  const privateSection = source.match(/<section class="private-section[\s\S]*?<\/section>/)?.[0];
+
+  assert.ok(privateSection, '비공개 잠금 영역을 찾을 수 있어야 합니다.');
+  assert.equal(source.includes('data-setup-code'), false);
+  assert.equal(source.includes('일회용 설정 코드'), false);
+  assert.equal(setupSource.includes('data-setup-code'), true);
+  assert.equal(setupSource.includes('일회용 설정 코드'), true);
+});
+
 test('비공개 API와 인증 응답은 캐시되지 않도록 설정한다', async () => {
   const request = { method: 'POST', headers: {} };
   const response = createResponse();
   await registerOptionsHandler(request, response);
   assert.equal(response.getHeader('cache-control'), 'no-store, max-age=0');
+});
+
+test('최초 등록 코드는 credential이 생긴 뒤 재사용할 수 없다', () => {
+  assert.deepEqual(
+    getRegistrationAccess({ sessionAuthorized: false, setupAuthorized: true, hasCredential: false }),
+    { allowed: true, bootstrap: true },
+  );
+  assert.deepEqual(
+    getRegistrationAccess({ sessionAuthorized: false, setupAuthorized: true, hasCredential: true }),
+    { allowed: false, status: 409, error: '최초 패스키 설정은 이미 완료되었습니다.' },
+  );
+});
+
+test('추가 패스키는 인증된 세션에서만 등록할 수 있다', () => {
+  assert.deepEqual(
+    getRegistrationAccess({ sessionAuthorized: true, setupAuthorized: false, hasCredential: true }),
+    { allowed: true, bootstrap: false },
+  );
+  assert.deepEqual(
+    getRegistrationAccess({ sessionAuthorized: false, setupAuthorized: false, hasCredential: true }),
+    { allowed: false, status: 403, error: '패스키 등록 권한이 없습니다.' },
+  );
 });

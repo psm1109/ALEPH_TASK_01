@@ -3,16 +3,32 @@ import { consumeChallenge } from '../_lib/challenges.js';
 import { getPasskeyConfig } from '../_lib/config.js';
 import { getSql } from '../_lib/db.js';
 import { logServerError, methodAllowed, readJsonBody, sendJson } from '../_lib/http.js';
+import { getRegistrationAccess } from '../_lib/registration-access.js';
 import { createSessionCookie, hasSetupAccess, hasValidSession } from '../_lib/session.js';
 
 export default async function handler(request, response) {
   if (!methodAllowed(request, response, 'POST')) return;
-  if (!hasValidSession(request) && !hasSetupAccess(request)) {
-    sendJson(response, 403, { error: '패스키 등록 권한이 없습니다.' });
+  const sessionAuthorized = hasValidSession(request);
+  const setupAuthorized = hasSetupAccess(request);
+  const initialAccess = getRegistrationAccess({ sessionAuthorized, setupAuthorized, hasCredential: false });
+  if (!initialAccess.allowed) {
+    sendJson(response, initialAccess.status, { error: initialAccess.error });
     return;
   }
 
   try {
+    const sql = getSql();
+    const existing = await sql`SELECT 1 FROM passkey_credentials LIMIT 1`;
+    const registrationAccess = getRegistrationAccess({
+      sessionAuthorized,
+      setupAuthorized,
+      hasCredential: existing.length > 0,
+    });
+    if (!registrationAccess.allowed) {
+      sendJson(response, registrationAccess.status, { error: registrationAccess.error });
+      return;
+    }
+
     const { ceremonyId, credential } = readJsonBody(request);
     const challenge = await consumeChallenge(ceremonyId, 'registration');
     if (!challenge || !credential) {
@@ -34,16 +50,15 @@ export default async function handler(request, response) {
     }
 
     const { credential: passkey, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
-    const sql = getSql();
     await sql`
       INSERT INTO passkey_credentials (
-        credential_id, public_key, counter, transports, device_type, backed_up, webauthn_user_id
+        credential_id, public_key, counter, transports, device_type, backed_up,
+        webauthn_user_id, bootstrap_registration
       ) VALUES (
         ${passkey.id}, ${Buffer.from(passkey.publicKey)}, ${passkey.counter},
         ${JSON.stringify(passkey.transports || [])}::jsonb, ${credentialDeviceType},
-        ${credentialBackedUp}, ${challenge.webauthn_user_id}
+        ${credentialBackedUp}, ${challenge.webauthn_user_id}, ${registrationAccess.bootstrap}
       )
-      ON CONFLICT (credential_id) DO NOTHING
     `;
     response.setHeader('Set-Cookie', createSessionCookie());
     sendJson(response, 200, { verified: true });

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>첫 패스키 설정</title>
+    <link rel="stylesheet" href="../styles.css" />
+    <script type="module" src="../setup.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#setup-main">본문으로 건너뛰기</a>
+    <main class="setup-page" id="setup-main">
+      <section class="setup-card" aria-labelledby="setup-title">
+        <p class="private-eyebrow">ONE-TIME OWNER SETUP</p>
+        <h1 id="setup-title">첫 패스키 설정</h1>
+        <p class="setup-lead">이 페이지는 아직 패스키가 하나도 없을 때만 사용할 수 있습니다. 등록을 시작하면 브라우저가 Windows Hello, 휴대폰 또는 패스키 관리자를 선택할 수 있는 기본 창을 엽니다.</p>
+
+        <div class="setup-form" data-setup-form>
+          <label for="setup-code">일회용 설정 코드</label>
+          <input id="setup-code" name="setup-code" type="password" autocomplete="one-time-code" data-setup-code />
+          <button type="button" data-setup-register>기기 패스키 등록 시작</button>
+          <p>이 코드는 최초 소유자 확인에만 사용되며 패스키로 저장되지 않습니다.</p>
+        </div>
+
+        <div class="setup-complete" data-setup-complete hidden>
+          <h2>첫 패스키 설정이 완료되었습니다</h2>
+          <p>추가 패스키는 기존 패스키로 비공개 공간을 연 뒤 등록할 수 있습니다.</p>
+        </div>
+
+        <p class="setup-message" data-setup-message role="status" aria-live="polite"></p>
+        <a class="setup-back" href="/">공개 페이지로 돌아가기</a>
+      </section>
+    </main>
+  </body>
+</html>

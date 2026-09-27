@@ -6,9 +6,17 @@ CREATE TABLE IF NOT EXISTS passkey_credentials (
   device_type text NOT NULL,
   backed_up boolean NOT NULL DEFAULT false,
   webauthn_user_id bytea NOT NULL,
+  bootstrap_registration boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
   last_used_at timestamptz
 );
+
+ALTER TABLE passkey_credentials
+  ADD COLUMN IF NOT EXISTS bootstrap_registration boolean NOT NULL DEFAULT false;
+
+CREATE UNIQUE INDEX IF NOT EXISTS passkey_credentials_single_bootstrap_idx
+  ON passkey_credentials (bootstrap_registration)
+  WHERE bootstrap_registration = true;
 
 CREATE TABLE IF NOT EXISTS webauthn_challenges (
   ceremony_id uuid PRIMARY KEY,

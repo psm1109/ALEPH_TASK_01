@@ -3,12 +3,16 @@ import { saveChallenge } from '../_lib/challenges.js';
 import { getPasskeyConfig } from '../_lib/config.js';
 import { getSql } from '../_lib/db.js';
 import { logServerError, methodAllowed, sendJson } from '../_lib/http.js';
+import { getRegistrationAccess } from '../_lib/registration-access.js';
 import { hasSetupAccess, hasValidSession } from '../_lib/session.js';
 
 export default async function handler(request, response) {
   if (!methodAllowed(request, response, 'POST')) return;
-  if (!hasValidSession(request) && !hasSetupAccess(request)) {
-    sendJson(response, 403, { error: '패스키 등록 권한이 없습니다.' });
+  const sessionAuthorized = hasValidSession(request);
+  const setupAuthorized = hasSetupAccess(request);
+  const initialAccess = getRegistrationAccess({ sessionAuthorized, setupAuthorized, hasCredential: false });
+  if (!initialAccess.allowed) {
+    sendJson(response, initialAccess.status, { error: initialAccess.error });
     return;
   }
 
@@ -18,6 +22,16 @@ export default async function handler(request, response) {
     const credentials = await sql`
       SELECT credential_id, transports FROM passkey_credentials ORDER BY created_at ASC
     `;
+    const registrationAccess = getRegistrationAccess({
+      sessionAuthorized,
+      setupAuthorized,
+      hasCredential: credentials.length > 0,
+    });
+    if (!registrationAccess.allowed) {
+      sendJson(response, registrationAccess.status, { error: registrationAccess.error });
+      return;
+    }
+
     const options = await generateRegistrationOptions({
       rpName: config.rpName,
       rpID: config.rpID,

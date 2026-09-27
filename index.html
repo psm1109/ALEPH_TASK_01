@@ -239,27 +239,19 @@
           <div class="private-content" data-private-content hidden>
             <div class="private-content-header">
               <p class="private-status"><span aria-hidden="true">●</span> 패스키 인증됨</p>
-              <button class="private-logout" type="button" data-passkey-logout>잠그기</button>
+              <div class="private-actions">
+                <button class="passkey-add" type="button" data-passkey-add>패스키 추가</button>
+                <button class="private-logout" type="button" data-passkey-logout>잠그기</button>
+              </div>
             </div>
             <div class="private-items" data-private-items></div>
           </div>
 
           <p class="private-message" data-private-message role="status" aria-live="polite"></p>
-
-          <details class="passkey-setup">
-            <summary>이 기기에 첫 패스키 등록</summary>
-            <div class="passkey-setup-fields">
-              <label for="setup-secret">설정 비밀값</label>
-              <input id="setup-secret" name="setup-secret" type="password" autocomplete="off" data-setup-secret />
-              <button type="button" data-passkey-register>새 패스키 등록</button>
-            </div>
-            <p>최초 등록용 비밀값은 Vercel 환경변수에만 보관하며 브라우저에 저장하지 않습니다.</p>
-          </details>
         </div>
       </section>
 
     </main>
-
 
     <div class="gallery-modal" id="learning-gallery" role="dialog" aria-modal="true" aria-labelledby="gallery-title" aria-describedby="gallery-caption" hidden>
       <div class="gallery-backdrop" data-gallery-close></div>
