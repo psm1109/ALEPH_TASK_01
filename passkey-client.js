@@ -1,5 +1,9 @@
 import { startAuthentication, startRegistration } from '@simplewebauthn/browser';
 
+export const getPasskeyEntryRoute = (registrationAvailable) => (
+  registrationAvailable ? '/setup' : null
+);
+
 export const requestJson = async (url, options = {}) => {
   const response = await fetch(url, {
     ...options,

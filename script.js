@@ -1,5 +1,5 @@
 import { browserSupportsPasskeys } from '@simplewebauthn/browser';
-import { requestJson, runPasskeyCeremony } from './passkey-client.js';
+import { getPasskeyEntryRoute, requestJson, runPasskeyCeremony } from './passkey-client.js';
 
 const closeAllDetails = document.querySelector('.close-all-details');
 const understandingItems = document.querySelectorAll('#work-style .understanding-item');
@@ -145,8 +145,17 @@ const loadPrivateItems = async ({ quiet = false } = {}) => {
 
 loginButton.addEventListener('click', async () => {
   loginButton.disabled = true;
-  setPrivateMessage('패스키를 확인하고 있습니다.');
+  setPrivateMessage('패스키 등록 상태를 확인하고 있습니다.');
   try {
+    const { registrationAvailable } = await requestJson('/api/passkey/status', { method: 'GET' });
+    const setupRoute = getPasskeyEntryRoute(registrationAvailable);
+    if (setupRoute) {
+      setPrivateMessage('첫 패스키 등록 화면으로 이동합니다.');
+      window.location.assign(setupRoute);
+      return;
+    }
+
+    setPrivateMessage('패스키를 확인하고 있습니다.');
     await runPasskeyCeremony('authenticate');
     await loadPrivateItems();
   } catch (error) {

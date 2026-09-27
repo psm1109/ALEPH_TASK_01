@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { getRegistrationAccess } from '../api/_lib/registration-access.js';
 import privateItemsHandler from '../api/private-items.js';
 import registerOptionsHandler from '../api/passkey/register-options.js';
+import { getPasskeyEntryRoute } from '../passkey-client.js';
 
 const PRIVATE_MARKERS = [
   '준비 중인 프로젝트 메모',
@@ -79,6 +80,8 @@ test('공개 잠금 패널에는 최초 설정 코드 입력을 노출하지 않
   assert.ok(privateSection, '비공개 잠금 영역을 찾을 수 있어야 합니다.');
   assert.equal(source.includes('data-setup-code'), false);
   assert.equal(source.includes('일회용 설정 코드'), false);
+  assert.equal(privateSection.includes('data-first-passkey-setup'), false);
+  assert.equal(privateSection.includes('href="/setup"'), false);
   assert.equal(setupSource.includes('data-setup-code'), true);
   assert.equal(setupSource.includes('일회용 설정 코드'), true);
 });
@@ -110,4 +113,9 @@ test('추가 패스키는 인증된 세션에서만 등록할 수 있다', () =>
     getRegistrationAccess({ sessionAuthorized: false, setupAuthorized: false, hasCredential: true }),
     { allowed: false, status: 403, error: '패스키 등록 권한이 없습니다.' },
   );
+});
+
+test('패스키가 없을 때 열기 동작은 최초 설정 화면으로 연결한다', () => {
+  assert.equal(getPasskeyEntryRoute(true), '/setup');
+  assert.equal(getPasskeyEntryRoute(false), null);
 });
