@@ -7,7 +7,7 @@
     <title>나를 설명하는 작은 기록</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232459b8'/%3E%3Cpath d='M9 23 16 8 23 23M12 18h8' fill='none' stroke='white' stroke-width='3'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="styles.css" />
-    <script src="script.js" defer></script>
+    <script type="module" src="script.js"></script>
   </head>
   <body id="top">
     <a class="skip-link" href="#main">본문으로 건너뛰기</a>
@@ -215,6 +215,51 @@
           <div class="detail-actions">
             <button class="close-all-details" type="button" aria-label="저를 이해하는 몇 가지 기준 항목 모두 닫기">모두 닫기</button>
           </div>
+        </div>
+      </section>
+
+      <div class="privacy-boundary" role="separator" aria-label="여기부터 비공개 영역">
+        <span>PUBLIC</span>
+        <strong>여기부터 비공개</strong>
+        <span>PRIVATE</span>
+      </div>
+
+      <section class="private-section section" id="private-space" aria-labelledby="private-title">
+        <div class="private-heading">
+          <p class="private-eyebrow">PASSKEY REQUIRED</p>
+          <h2 id="private-title">나만 보는 자리</h2>
+          <p>이 아래의 기록은 패스키 인증이 끝난 뒤 서버에서 가져옵니다.</p>
+        </div>
+
+        <div class="private-panel" data-private-panel data-state="locked">
+          <div class="private-lock" data-private-lock>
+            <span class="lock-mark" aria-hidden="true">⌁</span>
+            <div>
+              <h3>비공개 기록이 잠겨 있습니다</h3>
+              <p>인증 전에는 기록의 제목과 내용 모두 이 페이지에 포함되지 않습니다.</p>
+            </div>
+            <button class="passkey-button" type="button" data-passkey-login>패스키로 열기</button>
+          </div>
+
+          <div class="private-content" data-private-content hidden>
+            <div class="private-content-header">
+              <p class="private-status"><span aria-hidden="true">●</span> 패스키 인증됨</p>
+              <button class="private-logout" type="button" data-passkey-logout>잠그기</button>
+            </div>
+            <div class="private-items" data-private-items></div>
+          </div>
+
+          <p class="private-message" data-private-message role="status" aria-live="polite"></p>
+
+          <details class="passkey-setup">
+            <summary>이 기기에 첫 패스키 등록</summary>
+            <div class="passkey-setup-fields">
+              <label for="setup-secret">설정 비밀값</label>
+              <input id="setup-secret" name="setup-secret" type="password" autocomplete="off" data-setup-secret />
+              <button type="button" data-passkey-register>새 패스키 등록</button>
+            </div>
+            <p>최초 등록용 비밀값은 Vercel 환경변수에만 보관하며 브라우저에 저장하지 않습니다.</p>
+          </details>
         </div>
       </section>
 

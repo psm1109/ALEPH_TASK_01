@@ -1,0 +1,22 @@
+{
+  "name": "aleph-task-01-private-space",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "npm run build && node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.2",
+    "@simplewebauthn/browser": "^14.0.0",
+    "@simplewebauthn/server": "^14.0.0"
+  },
+  "devDependencies": {
+    "vite": "^7.1.7"
+  }
+}

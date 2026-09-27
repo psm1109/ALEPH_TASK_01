@@ -1,0 +1,18 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/private-items",
+    "cookie": null
+  },
+  "response": {
+    "status": 401,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store, max-age=0"
+    },
+    "body": {
+      "error": "패스키 인증이 필요합니다."
+    }
+  },
+  "verification": "tests/private-boundary.test.js invokes the deployed handler contract without credentials"
+}

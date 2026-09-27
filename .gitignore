@@ -3,7 +3,12 @@
 /pdf-preview.png
 /images/*.png
 
-# Local Neon credentials and installed dependencies
-/.env.local
+# Local credentials, generated service state, dependencies, and builds
+/.env
+/.env.*
+!/.env.example
 /.neon
 /node_modules/
+/dist/
+/.vercel/
+npm-debug.log*

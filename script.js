@@ -1,3 +1,9 @@
+import {
+  browserSupportsWebAuthn,
+  startAuthentication,
+  startRegistration,
+} from '@simplewebauthn/browser';
+
 const closeAllDetails = document.querySelector('.close-all-details');
 const understandingItems = document.querySelectorAll('#work-style .understanding-item');
 
@@ -27,7 +33,14 @@ const galleryCaption = document.querySelector('#gallery-caption');
 const galleryCloseButtons = document.querySelectorAll('[data-gallery-close]');
 const previousButton = document.querySelector('[data-gallery-prev]');
 const nextButton = document.querySelector('[data-gallery-next]');
-const galleryImages = Array.from({ length: 6 }, (_, index) => `images/${index + 1}.jpg`);
+const galleryImageModules = import.meta.glob('./images/*.jpg', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+});
+const galleryImages = Object.entries(galleryImageModules)
+  .sort(([left], [right]) => left.localeCompare(right, undefined, { numeric: true }))
+  .map(([, url]) => url);
 let activeImageIndex = 0;
 let lastFocusedElement;
 
@@ -78,3 +91,146 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'ArrowLeft') showGalleryImage(activeImageIndex - 1);
   if (event.key === 'ArrowRight') showGalleryImage(activeImageIndex + 1);
 });
+
+const privatePanel = document.querySelector('[data-private-panel]');
+const privateLock = document.querySelector('[data-private-lock]');
+const privateContent = document.querySelector('[data-private-content]');
+const privateItems = document.querySelector('[data-private-items]');
+const privateMessage = document.querySelector('[data-private-message]');
+const loginButton = document.querySelector('[data-passkey-login]');
+const logoutButton = document.querySelector('[data-passkey-logout]');
+const registerButton = document.querySelector('[data-passkey-register]');
+const setupSecretInput = document.querySelector('[data-setup-secret]');
+
+const requestJson = async (url, options = {}) => {
+  const response = await fetch(url, {
+    ...options,
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(payload.error || '요청을 처리하지 못했습니다.');
+    error.status = response.status;
+    throw error;
+  }
+  return payload;
+};
+
+const setPrivateMessage = (message, isError = false) => {
+  privateMessage.textContent = message;
+  privateMessage.classList.toggle('is-error', isError);
+};
+
+const renderPrivateItems = (items) => {
+  privateItems.replaceChildren();
+  items.forEach((item) => {
+    const article = document.createElement('article');
+    const category = document.createElement('p');
+    const title = document.createElement('h3');
+    const body = document.createElement('p');
+    article.className = 'private-item';
+    category.className = 'private-item-category';
+    category.textContent = item.category;
+    title.textContent = item.title;
+    body.textContent = item.body;
+    article.append(category, title, body);
+    privateItems.append(article);
+  });
+};
+
+const lockPrivateSpace = () => {
+  privatePanel.dataset.state = 'locked';
+  privateContent.hidden = true;
+  privateLock.hidden = false;
+  privateItems.replaceChildren();
+};
+
+const loadPrivateItems = async ({ quiet = false } = {}) => {
+  try {
+    const { items } = await requestJson('/api/private-items', { method: 'GET' });
+    renderPrivateItems(items);
+    privateLock.hidden = true;
+    privateContent.hidden = false;
+    privatePanel.dataset.state = 'open';
+    if (!quiet) setPrivateMessage('비공개 기록을 안전하게 불러왔습니다.');
+    return true;
+  } catch (error) {
+    lockPrivateSpace();
+    if (!quiet && error.status !== 401) setPrivateMessage(error.message, true);
+    return false;
+  }
+};
+
+const runPasskeyCeremony = async (kind, setupSecret = '') => {
+  const isRegistration = kind === 'register';
+  const prefix = isRegistration ? 'register' : 'authenticate';
+  const headers = setupSecret ? { 'X-Passkey-Setup-Secret': setupSecret } : {};
+  const { options, ceremonyId } = await requestJson(`/api/passkey/${prefix}-options`, {
+    method: 'POST',
+    headers,
+    body: '{}',
+  });
+  const credential = isRegistration
+    ? await startRegistration({ optionsJSON: options })
+    : await startAuthentication({ optionsJSON: options });
+  await requestJson(`/api/passkey/${prefix}-verify`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ ceremonyId, credential }),
+  });
+};
+
+loginButton.addEventListener('click', async () => {
+  loginButton.disabled = true;
+  setPrivateMessage('패스키를 확인하고 있습니다.');
+  try {
+    await runPasskeyCeremony('authenticate');
+    await loadPrivateItems();
+  } catch (error) {
+    setPrivateMessage(error.message, true);
+  } finally {
+    loginButton.disabled = false;
+  }
+});
+
+registerButton.addEventListener('click', async () => {
+  const setupSecret = setupSecretInput.value;
+  if (!setupSecret) {
+    setPrivateMessage('설정 비밀값을 입력해 주세요.', true);
+    setupSecretInput.focus();
+    return;
+  }
+
+  registerButton.disabled = true;
+  setPrivateMessage('새 패스키를 등록하고 있습니다.');
+  try {
+    await runPasskeyCeremony('register', setupSecret);
+    setupSecretInput.value = '';
+    await loadPrivateItems();
+  } catch (error) {
+    setPrivateMessage(error.message, true);
+  } finally {
+    registerButton.disabled = false;
+  }
+});
+
+logoutButton.addEventListener('click', async () => {
+  try {
+    await requestJson('/api/passkey/logout', { method: 'POST', body: '{}' });
+  } finally {
+    lockPrivateSpace();
+    setPrivateMessage('비공개 기록을 다시 잠갔습니다.');
+  }
+});
+
+if (!browserSupportsWebAuthn()) {
+  loginButton.disabled = true;
+  registerButton.disabled = true;
+  setPrivateMessage('이 브라우저에서는 패스키를 사용할 수 없습니다.', true);
+} else {
+  loadPrivateItems({ quiet: true });
+}

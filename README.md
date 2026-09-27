@@ -13,6 +13,7 @@
 - **강점과 취향 세 가지**: 배움을 적용하는 실천력, 신뢰를 만드는 협업 방식, 노래·기타와 여행·등산에 대한 관심을 소개합니다. 각 경험은 요약과 상황·행동·결과로 구성되어 있습니다.
 - **저를 움직이는 세 가지 가치**: 건강·자유·신뢰가 나에게 갖는 의미를 설명합니다.
 - **저를 이해하는 몇 가지 기준**: 몰입하는 순간, 힘이 빠지는 순간, 사람들과 가까워지는 방식, 알아두면 좋은 점을 담았습니다.
+- **나만 보는 자리**: 공개 소개가 끝나는 지점에 분명한 경계를 두고, 패스키 인증 뒤에만 Neon의 비공개 기록을 보여줍니다.
 
 ## 주요 기능
 
@@ -25,6 +26,8 @@
 | 졸업 작품 결과 | Google Drive의 졸업 작품 시연 영상을 새 탭으로 엽니다. |
 | 여행 기록 | Notion의 여행 자료를 새 탭으로 엽니다. |
 | 나를 이해하는 기준 | 항목별로 펼치거나 접고, ‘모두 닫기’로 이 영역의 항목을 한꺼번에 접습니다. |
+| 비공개 기록 | 패스키 인증 뒤에만 서버가 Neon에서 자료를 읽고 화면에 추가합니다. |
+| 잠그기 | `HttpOnly` 인증 세션을 만료시키고 화면의 비공개 DOM을 즉시 비웁니다. |
 | 맨 위로 이동 | 페이지 하단의 ‘맨 위로’ 링크를 사용합니다. |
 
 ## 접근성 및 화면 대응
@@ -39,13 +42,45 @@
 
 ## 실행 방법
 
-별도의 패키지 설치나 빌드 없이 `index.html`을 브라우저에서 열면 됩니다. 학습 이미지는 아래 폴더 구조를 유지해야 하며, Google Drive와 Notion 자료를 열려면 인터넷 연결이 필요합니다.
+Node.js 22 이상에서 의존성을 설치하고 Vite 개발 서버를 실행합니다.
+
+```powershell
+npm install
+npm run dev
+```
+
+API까지 로컬에서 확인하려면 Vercel CLI로 실행하고 `.env.local`에 아래 환경변수를 설정해야 합니다. 비밀값 원문은 Git에 추가하지 않습니다.
 
 ```text
-T01/
+DATABASE_URL
+PASSKEY_RP_ID
+PASSKEY_ORIGIN
+PASSKEY_OWNER_NAME
+PASSKEY_USER_HANDLE
+PASSKEY_SETUP_SECRET
+SESSION_SECRET
+CBOR_NATIVE_ACCELERATION_DISABLED=true
+```
+
+`PASSKEY_SETUP_SECRET`와 `SESSION_SECRET`은 서로 다른 32자 이상의 무작위 값이어야 합니다. `PASSKEY_RP_ID`는 스킴 없는 배포 호스트, `PASSKEY_ORIGIN`은 `https://`를 포함한 정확한 배포 Origin으로 설정합니다. 예시 형식은 `.env.example`에서 확인할 수 있습니다.
+
+Neon SQL Editor에서 `db/schema.sql`을 먼저 실행합니다. 이 SQL은 패스키 자격 증명, 5분짜리 일회용 챌린지, 비공개 항목 테이블을 만들고 세 종류의 자리표시자를 넣습니다. 실제 프로젝트·지원·회고 내용은 공개 Git 파일이 아닌 Neon에서 수정합니다.
+
+```powershell
+npm test
+```
+
+이 명령은 프로덕션 빌드, 비인증 `401`, 등록 권한 `403`, 응답 캐시 금지, 공개 빌드 내 비공개 문구 부재를 검사합니다.
+
+```text
+ALEPH_TASK_01/
 ├── index.html       # 페이지 내용과 구조
 ├── styles.css       # 스타일, 반응형 배치, 애니메이션
-├── script.js        # 상세 접기, 애니메이션 제어, 학습 모달
+├── script.js        # 기존 상호작용과 패스키 브라우저 흐름
+├── api/             # Vercel 서버리스 패스키·비공개 자료 API
+├── db/schema.sql    # Neon 테이블과 초기 비공개 항목 자리표시자
+├── docs/card1/      # 화면과 비인증 응답 증거
+├── tests/           # 인증 경계 회귀 검사
 ├── images/
 │   ├── 1.jpg
 │   ├── 2.jpg
@@ -53,10 +88,24 @@ T01/
 │   ├── 4.jpg
 │   ├── 5.jpg
 │   └── 6.jpg
+├── vercel.json
 └── README.md
 ```
 
-배포할 때는 HTML·CSS·JavaScript와 `images` 폴더를 함께 포함합니다. 이미지 파일이 배포에서 빠지면 학습 모달의 사진이 표시되지 않습니다.
+Vercel은 `npm run build`로 `dist/`를 만들고 `api/`를 Node.js 함수(Node 22 이상)로 배포합니다. 환경변수를 설정한 뒤 최초 1회 화면의 ‘이 기기에 첫 패스키 등록’을 열어 설정 비밀값으로 소유자 패스키를 등록합니다. 이후에는 패스키만으로 비공개 자료를 열 수 있습니다.
+
+첫 패스키 등록과 로그인 확인이 끝나면 Vercel에서 `PASSKEY_SETUP_SECRET`을 제거해 신규 등록 부트스트랩을 닫습니다. 인증된 세션에서는 추가 패스키를 등록할 수 있으며, 모든 패스키를 잃어버린 복구 상황에서만 설정 비밀값을 임시로 다시 둡니다.
+
+## 비공개 경계 보안
+
+- 인증 쿠키는 JavaScript가 읽을 수 없는 `HttpOnly`, HTTPS 전용 `Secure`, 교차 사이트 전송을 막는 `SameSite=Strict`로 발급합니다.
+- 등록·인증 챌린지는 Neon에 저장하고 5분 이내 한 번만 소비합니다.
+- 사용자 검증을 `required`로 두고 등록된 credential의 서명과 카운터를 SimpleWebAuthn 서버에서 검증합니다.
+- `/api/private-items`는 세션을 먼저 검사하고, 인증되지 않으면 DB를 읽지 않은 채 `401`을 반환합니다.
+- 비공개 자료 응답과 인증 API에는 `Cache-Control: no-store`를 적용합니다.
+- 공개 HTML과 번들에는 비공개 항목 제목·본문을 넣지 않습니다. 인증 성공 뒤 API 응답을 `textContent`로 렌더링합니다.
+
+정적 검사 통과는 실제 Neon 스키마 적용, Vercel 환경변수 설정, Windows Hello·Touch ID 등 실기기 패스키 성공을 뜻하지 않습니다. 운영 검증 시에는 등록 → 로그아웃 → 패스키 로그인 → 직접 API 차단을 순서대로 확인해야 합니다.
 
 ## 페이지에 선언한 공개 범위
 
