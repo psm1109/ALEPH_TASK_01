@@ -97,6 +97,11 @@ const privateMessage = document.querySelector('[data-private-message]');
 const loginButton = document.querySelector('[data-passkey-login]');
 const logoutButton = document.querySelector('[data-passkey-logout]');
 const addPasskeyButton = document.querySelector('[data-passkey-add]');
+const managePasskeysButton = document.querySelector('[data-passkey-manage]');
+const managePasskeysDialog = document.querySelector('[data-passkey-manage-dialog]');
+const managePasskeysList = document.querySelector('[data-passkey-list]');
+const managePasskeysMessage = document.querySelector('[data-passkey-manage-message]');
+const managePasskeysCloseButtons = document.querySelectorAll('[data-passkey-manage-close]');
 const bootstrapDialog = document.querySelector('[data-passkey-bootstrap-dialog]');
 const bootstrapForm = document.querySelector('[data-passkey-bootstrap-form]');
 const bootstrapCodeInput = document.querySelector('[data-passkey-bootstrap-code]');
@@ -107,6 +112,68 @@ const bootstrapCancelButtons = document.querySelectorAll('[data-passkey-bootstra
 const setPrivateMessage = (message, isError = false) => {
   privateMessage.textContent = message;
   privateMessage.classList.toggle('is-error', isError);
+};
+
+const formatPasskeyDate = (value) => {
+  if (!value) return '사용 기록 없음';
+  return new Intl.DateTimeFormat('ko-KR', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value));
+};
+
+const setManagePasskeysMessage = (message, isError = false) => {
+  managePasskeysMessage.textContent = message;
+  managePasskeysMessage.classList.toggle('is-error', isError);
+};
+
+const loadPasskeys = async () => {
+  setManagePasskeysMessage('패스키 목록을 불러오고 있습니다.');
+  const { passkeys } = await requestJson('/api/passkey/credentials', { method: 'GET' });
+  managePasskeysList.replaceChildren();
+
+  passkeys.forEach((passkey) => {
+    const item = document.createElement('article');
+    const details = document.createElement('div');
+    const heading = document.createElement('h3');
+    const location = document.createElement('p');
+    const dates = document.createElement('p');
+    const deleteButton = document.createElement('button');
+
+    item.className = 'passkey-list-item';
+    details.className = 'passkey-list-details';
+    heading.textContent = passkey.bootstrap ? `${passkey.name} · 최초 등록` : passkey.name;
+    location.textContent = passkey.location;
+    dates.className = 'passkey-list-dates';
+    dates.textContent = `추가 ${formatPasskeyDate(passkey.createdAt)} · 최근 사용 ${formatPasskeyDate(passkey.lastUsedAt)}`;
+    deleteButton.type = 'button';
+    deleteButton.className = 'passkey-delete';
+    deleteButton.textContent = '삭제';
+    deleteButton.disabled = passkeys.length <= 1;
+    if (deleteButton.disabled) deleteButton.title = '마지막 패스키는 삭제할 수 없습니다.';
+    deleteButton.addEventListener('click', async () => {
+      if (!window.confirm(`${passkey.name}를 삭제할까요? 이 작업은 되돌릴 수 없습니다.`)) return;
+      deleteButton.disabled = true;
+      setManagePasskeysMessage('패스키를 삭제하고 있습니다.');
+      try {
+        await requestJson('/api/passkey/credentials', {
+          method: 'DELETE',
+          body: JSON.stringify({ credentialId: passkey.id }),
+        });
+        await loadPasskeys();
+        setManagePasskeysMessage('패스키를 삭제했습니다.');
+      } catch (error) {
+        deleteButton.disabled = false;
+        setManagePasskeysMessage(error.message, true);
+      }
+    });
+
+    details.append(heading, location, dates);
+    item.append(details, deleteButton);
+    managePasskeysList.append(item);
+  });
+
+  setManagePasskeysMessage('');
 };
 
 const renderPrivateItems = (items) => {
@@ -227,10 +294,27 @@ addPasskeyButton.addEventListener('click', async () => {
   }
 });
 
+managePasskeysButton.addEventListener('click', async () => {
+  managePasskeysButton.disabled = true;
+  managePasskeysDialog.showModal();
+  try {
+    await loadPasskeys();
+  } catch (error) {
+    setManagePasskeysMessage(error.message, true);
+  } finally {
+    managePasskeysButton.disabled = false;
+  }
+});
+
+managePasskeysCloseButtons.forEach((button) => button.addEventListener('click', () => {
+  managePasskeysDialog.close();
+}));
+
 logoutButton.addEventListener('click', async () => {
   try {
     await requestJson('/api/passkey/logout', { method: 'POST', body: '{}' });
   } finally {
+    if (managePasskeysDialog.open) managePasskeysDialog.close();
     lockPrivateSpace();
     setPrivateMessage('비공개 기록을 다시 잠갔습니다.');
   }
@@ -241,6 +325,7 @@ const supportsPasskeys = browserSupportsWebAuthn();
 if (!supportsPasskeys) {
   loginButton.disabled = true;
   addPasskeyButton.disabled = true;
+  managePasskeysButton.disabled = true;
   setPrivateMessage('이 브라우저에서는 패스키를 사용할 수 없습니다.', true);
 } else {
   loadPrivateItems({ quiet: true });

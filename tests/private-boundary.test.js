@@ -4,6 +4,8 @@ import { test } from 'node:test';
 import { getRegistrationAccess } from '../api/_lib/registration-access.js';
 import privateItemsHandler from '../api/private-items.js';
 import registerOptionsHandler from '../api/passkey/register-options.js';
+import credentialsHandler from '../api/passkey/credentials.js';
+import { describePasskeyLocation } from '../api/_lib/passkey-metadata.js';
 import { shouldStartPasskeyRegistration } from '../passkey-client.js';
 
 const PRIVATE_MARKERS = [
@@ -117,6 +119,8 @@ test('공개 잠금 패널에는 별도 등록 버튼을 노출하지 않고 같
   assert.equal(privateSection.includes('href="/setup"'), false);
   assert.equal(source.includes('data-passkey-bootstrap-dialog'), true);
   assert.equal(source.includes('data-passkey-bootstrap-code'), true);
+  assert.equal(source.includes('data-passkey-manage'), true);
+  assert.equal(source.includes('data-passkey-manage-dialog'), true);
   assert.equal(setupSource.includes('data-setup-code'), true);
   assert.equal(setupSource.includes('일회용 설정 코드'), true);
 });
@@ -170,4 +174,36 @@ test('패스키 인증은 저장 당시 transport로 인증 기기를 제한하�
 
   assert.equal(source.includes('allowCredentials'), false);
   assert.equal(source.includes("userVerification: 'required'"), true);
+});
+
+test('비인증 사용자는 패스키 목록을 조회할 수 없다', async () => {
+  const request = { method: 'GET', headers: {} };
+  const response = createResponse();
+  await credentialsHandler(request, response);
+
+  assert.equal(response.statusCode, 401);
+  assert.deepEqual(JSON.parse(response.body), { error: '패스키 인증이 필요합니다.' });
+});
+
+test('패스키 저장 위치는 인증 transport와 백업 상태로 설명한다', () => {
+  assert.equal(
+    describePasskeyLocation({ transports: ['internal'], deviceType: 'singleDevice', backedUp: false }),
+    '이 기기의 Windows Hello 또는 기기 잠금',
+  );
+  assert.equal(
+    describePasskeyLocation({ transports: ['internal', 'hybrid'], deviceType: 'multiDevice', backedUp: true }),
+    '휴대폰 또는 동기화된 패스키 관리자',
+  );
+  assert.equal(
+    describePasskeyLocation({ transports: ['usb'], deviceType: 'singleDevice', backedUp: false }),
+    '외장 보안 키',
+  );
+});
+
+test('패스키 관리 화면은 마지막 credential 삭제를 서버에서 차단한다', async () => {
+  const source = await readFile(new URL('../api/passkey/credentials.js', import.meta.url), 'utf8');
+
+  assert.equal(source.includes('(SELECT count(*) FROM passkey_credentials) > 1'), true);
+  assert.equal(source.includes('SELECT credential_id FROM passkey_credentials FOR UPDATE'), true);
+  assert.equal(source.includes('마지막 패스키는 삭제할 수 없습니다.'), true);
 });

@@ -251,6 +251,7 @@
               <p class="private-status"><span aria-hidden="true">●</span> 패스키 인증됨</p>
               <div class="private-actions">
                 <button class="passkey-add" type="button" data-passkey-add>패스키 추가</button>
+                <button class="passkey-manage" type="button" data-passkey-manage>패스키 관리</button>
                 <button class="private-logout" type="button" data-passkey-logout>잠그기</button>
               </div>
             </div>
@@ -277,6 +278,20 @@
         </div>
         <p class="passkey-dialog-message" data-passkey-bootstrap-message role="status" aria-live="polite"></p>
       </form>
+    </dialog>
+
+    <dialog class="passkey-manage-dialog" data-passkey-manage-dialog aria-labelledby="passkey-manage-title">
+      <section class="passkey-manage-panel">
+        <button class="passkey-dialog-close" type="button" data-passkey-manage-close aria-label="패스키 관리 닫기">×</button>
+        <p class="private-eyebrow">PASSKEY MANAGEMENT</p>
+        <h2 id="passkey-manage-title">등록된 패스키</h2>
+        <p class="passkey-manage-description">브라우저가 제공한 정보를 바탕으로 저장 방식을 표시합니다. 마지막 패스키는 계정 잠금을 막기 위해 삭제할 수 없습니다.</p>
+        <div class="passkey-list" data-passkey-list></div>
+        <p class="passkey-dialog-message" data-passkey-manage-message role="status" aria-live="polite"></p>
+        <div class="passkey-dialog-actions">
+          <button type="button" data-passkey-manage-close>닫기</button>
+        </div>
+      </section>
     </dialog>
 
     <div class="gallery-modal" id="learning-gallery" role="dialog" aria-modal="true" aria-labelledby="gallery-title" aria-describedby="gallery-caption" hidden>
