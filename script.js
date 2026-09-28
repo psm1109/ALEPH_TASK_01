@@ -105,6 +105,7 @@ const managePasskeysCloseButtons = document.querySelectorAll('[data-passkey-mana
 const bootstrapDialog = document.querySelector('[data-passkey-bootstrap-dialog]');
 const bootstrapForm = document.querySelector('[data-passkey-bootstrap-form]');
 const bootstrapCodeInput = document.querySelector('[data-passkey-bootstrap-code]');
+const bootstrapNameInput = document.querySelector('[data-passkey-bootstrap-name]');
 const bootstrapSubmitButton = document.querySelector('[data-passkey-bootstrap-submit]');
 const bootstrapMessage = document.querySelector('[data-passkey-bootstrap-message]');
 const bootstrapCancelButtons = document.querySelectorAll('[data-passkey-bootstrap-cancel]');
@@ -138,6 +139,8 @@ const loadPasskeys = async () => {
     const heading = document.createElement('h3');
     const location = document.createElement('p');
     const dates = document.createElement('p');
+    const actions = document.createElement('div');
+    const renameButton = document.createElement('button');
     const deleteButton = document.createElement('button');
 
     item.className = 'passkey-list-item';
@@ -146,6 +149,31 @@ const loadPasskeys = async () => {
     location.textContent = passkey.location;
     dates.className = 'passkey-list-dates';
     dates.textContent = `추가 ${formatPasskeyDate(passkey.createdAt)} · 최근 사용 ${formatPasskeyDate(passkey.lastUsedAt)}`;
+    actions.className = 'passkey-list-actions';
+    renameButton.type = 'button';
+    renameButton.className = 'passkey-rename';
+    renameButton.textContent = '이름 변경';
+    renameButton.addEventListener('click', async () => {
+      const displayName = window.prompt('새 패스키 이름을 입력해 주세요.', passkey.name);
+      if (displayName === null) return;
+      if (!displayName.trim() || displayName.trim().length > 40) {
+        setManagePasskeysMessage('패스키 이름을 1~40자로 입력해 주세요.', true);
+        return;
+      }
+      renameButton.disabled = true;
+      setManagePasskeysMessage('패스키 이름을 저장하고 있습니다.');
+      try {
+        await requestJson('/api/passkey/credentials', {
+          method: 'PATCH',
+          body: JSON.stringify({ credentialId: passkey.id, displayName }),
+        });
+        await loadPasskeys();
+        setManagePasskeysMessage('패스키 이름을 변경했습니다.');
+      } catch (error) {
+        renameButton.disabled = false;
+        setManagePasskeysMessage(error.message, true);
+      }
+    });
     deleteButton.type = 'button';
     deleteButton.className = 'passkey-delete';
     deleteButton.textContent = '삭제';
@@ -169,7 +197,8 @@ const loadPasskeys = async () => {
     });
 
     details.append(heading, location, dates);
-    item.append(details, deleteButton);
+    actions.append(renameButton, deleteButton);
+    item.append(details, actions);
     managePasskeysList.append(item);
   });
 
@@ -224,22 +253,30 @@ const setBootstrapMessage = (message, isError = false) => {
 const openBootstrapDialog = () => {
   setBootstrapMessage('');
   bootstrapDialog.showModal();
-  bootstrapCodeInput.focus();
+  bootstrapNameInput.focus();
 };
 
 bootstrapCancelButtons.forEach((button) => button.addEventListener('click', () => {
   bootstrapCodeInput.value = '';
+  bootstrapNameInput.value = '';
   bootstrapDialog.close();
 }));
 
 bootstrapDialog.addEventListener('close', () => {
   bootstrapCodeInput.value = '';
+  bootstrapNameInput.value = '';
   bootstrapSubmitButton.disabled = false;
 });
 
 bootstrapForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const setupCode = bootstrapCodeInput.value;
+  const displayName = bootstrapNameInput.value.trim();
+  if (!displayName) {
+    setBootstrapMessage('패스키 이름을 입력해 주세요.', true);
+    bootstrapNameInput.focus();
+    return;
+  }
   if (!setupCode) {
     setBootstrapMessage('일회용 설정 코드를 입력해 주세요.', true);
     bootstrapCodeInput.focus();
@@ -249,7 +286,7 @@ bootstrapForm.addEventListener('submit', async (event) => {
   bootstrapSubmitButton.disabled = true;
   setBootstrapMessage('Windows의 패스키 저장 위치 선택 창을 여는 중입니다.');
   try {
-    await runPasskeyCeremony('register', setupCode);
+    await runPasskeyCeremony('register', { setupCode, displayName });
     bootstrapDialog.close();
     await loadPrivateItems();
     setPrivateMessage('첫 패스키를 등록하고 비공개 기록을 열었습니다.');
@@ -282,10 +319,19 @@ loginButton.addEventListener('click', async () => {
 });
 
 addPasskeyButton.addEventListener('click', async () => {
+  const displayName = window.prompt('이 패스키를 알아볼 수 있는 이름을 입력해 주세요.\n예: 회사 노트북 Windows Hello');
+  if (displayName === null) {
+    setPrivateMessage('패스키 추가를 취소했습니다.');
+    return;
+  }
+  if (!displayName.trim() || displayName.trim().length > 40) {
+    setPrivateMessage('패스키 이름을 1~40자로 입력해 주세요.', true);
+    return;
+  }
   addPasskeyButton.disabled = true;
   setPrivateMessage('새 패스키를 등록하고 있습니다.');
   try {
-    await runPasskeyCeremony('register');
+    await runPasskeyCeremony('register', { displayName });
     setPrivateMessage('새 패스키를 추가했습니다.');
   } catch (error) {
     setPrivateMessage(error.message, true);

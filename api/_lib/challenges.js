@@ -30,3 +30,15 @@ export async function consumeChallenge(ceremonyId, type) {
   `;
   return rows[0] || null;
 }
+
+export async function discardChallenge(ceremonyId, type) {
+  if (typeof ceremonyId !== 'string') return false;
+  const sql = getSql();
+  const rows = await sql`
+    DELETE FROM webauthn_challenges
+    WHERE ceremony_id = ${ceremonyId}
+      AND ceremony_type = ${type}
+    RETURNING ceremony_id
+  `;
+  return rows.length > 0;
+}

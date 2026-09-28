@@ -6,7 +6,8 @@ import privateItemsHandler from '../api/private-items.js';
 import registerOptionsHandler from '../api/passkey/register-options.js';
 import credentialsHandler from '../api/passkey/credentials.js';
 import { describePasskeyLocation } from '../api/_lib/passkey-metadata.js';
-import { shouldStartPasskeyRegistration } from '../passkey-client.js';
+import { normalizePasskeyName } from '../api/_lib/passkey-name.js';
+import { describePasskeyClientError, shouldStartPasskeyRegistration } from '../passkey-client.js';
 
 const PRIVATE_MARKERS = [
   '준비 중인 프로젝트 메모',
@@ -169,6 +170,16 @@ test('패스키 UI는 추가 capability가 아닌 WebAuthn API 지원 여부로 
   }
 });
 
+test('패스키 등록 취소는 저장되지 않았다는 한국어 안내를 반환한다', async () => {
+  const message = describePasskeyClientError({ name: 'NotAllowedError' }, true);
+  const clientSource = await readFile(new URL('../passkey-client.js', import.meta.url), 'utf8');
+  const challengeSource = await readFile(new URL('../api/_lib/challenges.js', import.meta.url), 'utf8');
+
+  assert.equal(message.includes('서버에는 패스키가 저장되지 않았습니다.'), true);
+  assert.equal(clientSource.includes('/api/passkey/challenge-cancel'), true);
+  assert.equal(challengeSource.includes('DELETE FROM webauthn_challenges'), true);
+});
+
 test('패스키 인증은 저장 당시 transport로 인증 기기를 제한하지 않는다', async () => {
   const source = await readFile(new URL('../api/passkey/authenticate-options.js', import.meta.url), 'utf8');
 
@@ -198,6 +209,24 @@ test('패스키 저장 위치는 인증 transport와 백업 상태로 설명한�
     describePasskeyLocation({ transports: ['usb'], deviceType: 'singleDevice', backedUp: false }),
     '외장 보안 키',
   );
+});
+
+test('패스키 이름은 공백을 정리한 1~40자만 저장한다', () => {
+  assert.equal(normalizePasskeyName('  회사 노트북   Windows Hello  '), '회사 노트북 Windows Hello');
+  assert.equal(normalizePasskeyName(''), null);
+  assert.equal(normalizePasskeyName('가'.repeat(41)), null);
+});
+
+test('패스키 등록과 목록 API는 사람이 알아볼 수 있는 이름을 저장하고 반환한다', async () => {
+  const registerSource = await readFile(new URL('../api/passkey/register-verify.js', import.meta.url), 'utf8');
+  const credentialsSource = await readFile(new URL('../api/passkey/credentials.js', import.meta.url), 'utf8');
+  const schemaSource = await readFile(new URL('../db/schema.sql', import.meta.url), 'utf8');
+
+  assert.equal(registerSource.includes('display_name'), true);
+  assert.equal(registerSource.includes('${passkeyName}'), true);
+  assert.equal(credentialsSource.includes('name: credential.display_name'), true);
+  assert.equal(credentialsSource.includes("request.method === 'PATCH'"), true);
+  assert.equal(schemaSource.includes('display_name text NOT NULL'), true);
 });
 
 test('패스키 관리 화면은 마지막 credential 삭제를 서버에서 차단한다', async () => {

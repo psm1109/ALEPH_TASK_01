@@ -2,6 +2,15 @@ import { startAuthentication, startRegistration } from '@simplewebauthn/browser'
 
 export const shouldStartPasskeyRegistration = (registrationAvailable) => registrationAvailable;
 
+export const describePasskeyClientError = (error, isRegistration) => {
+  if (error?.name === 'NotAllowedError') {
+    return isRegistration
+      ? '패스키 등록을 취소했거나 등록 창을 완료하지 않았습니다. 서버에는 패스키가 저장되지 않았습니다.'
+      : '패스키 인증을 취소했거나 인증 창을 완료하지 않았습니다.';
+  }
+  return error?.message || '패스키 요청을 처리하지 못했습니다.';
+};
+
 export const requestJson = async (url, options = {}) => {
   const response = await fetch(url, {
     ...options,
@@ -25,7 +34,7 @@ export const requestJson = async (url, options = {}) => {
   return payload;
 };
 
-export const runPasskeyCeremony = async (kind, setupCode = '') => {
+export const runPasskeyCeremony = async (kind, { setupCode = '', displayName = '' } = {}) => {
   const isRegistration = kind === 'register';
   const prefix = isRegistration ? 'register' : 'authenticate';
   const headers = setupCode ? { 'X-Passkey-Setup-Secret': setupCode } : {};
@@ -34,12 +43,24 @@ export const runPasskeyCeremony = async (kind, setupCode = '') => {
     headers,
     body: '{}',
   });
-  const credential = isRegistration
-    ? await startRegistration({ optionsJSON: options })
-    : await startAuthentication({ optionsJSON: options });
+  let credential;
+  try {
+    credential = isRegistration
+      ? await startRegistration({ optionsJSON: options })
+      : await startAuthentication({ optionsJSON: options });
+  } catch (error) {
+    await requestJson('/api/passkey/challenge-cancel', {
+      method: 'POST',
+      body: JSON.stringify({
+        ceremonyId,
+        ceremonyType: isRegistration ? 'registration' : 'authentication',
+      }),
+    }).catch(() => {});
+    throw new Error(describePasskeyClientError(error, isRegistration));
+  }
   await requestJson(`/api/passkey/${prefix}-verify`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ ceremonyId, credential }),
+    body: JSON.stringify({ ceremonyId, credential, ...(isRegistration ? { displayName } : {}) }),
   });
 };

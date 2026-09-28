@@ -3,45 +3,31 @@
 ## 기준 상태
 
 - 현재 브랜치: `t08/passkey`
-- 기준 커밋(현재 HEAD): `0b7a76304ecf9c20bbee6f347ac9cefe04666c0f`
+- 기준 커밋(현재 HEAD): `c91dafc899cdac357987009606646cd08988d14e`
 - 커밋 상태: 이번 변경은 아직 커밋하지 않음
-- 작업 트리: 패스키 비공개 공간 구현 파일이 수정·추가된 상태
+- 작업 트리: 사용자가 기존에 변경한 `index.html`의 skip-link 주석 처리와, 이번 패스키 이름·취소 검증 보완 파일이 수정·추가된 상태
 
 ## 이번 작업에서 완료한 내용
 
-- 기존 공개 소개 페이지의 마지막 아래에 얇은 반투명 구분선과 잠금 패널을 추가했습니다.
-- 구분선의 문구·배지·점선을 제거하고, 잠금 안내 왼쪽의 원형 아이콘도 제거했습니다.
-- 공개 잠금 패널에서 최초 등록 코드 입력을 제거하고 `/setup` 일회성 소유자 설정 화면을 별도 Vite HTML 엔트리로 분리했습니다. 공개 `index.html` 소스에는 설정 폼도 포함되지 않습니다.
-- 잠금 화면의 `패스키로 열기`를 누르면 등록된 credential 수를 먼저 확인합니다. 0개면 같은 페이지에서 일회용 소유자 확인 대화상자를 열고, 코드 확인 직후 Windows의 패스키 저장 위치 선택 창을 호출합니다. 1개 이상이면 패스키 인증을 바로 시작하며 별도 등록 버튼은 노출하지 않습니다.
-- 첫 credential이 존재하면 설정 코드 등록을 옵션·검증 단계에서 모두 `409`로 차단하고, 추가 패스키는 인증된 세션에서만 등록하도록 변경했습니다.
-- 패스키 저장 위치는 강제하지 않아 브라우저의 기본 선택 창에서 Windows Hello, 휴대폰·QR, 패스키 관리자 또는 보안 키를 선택할 수 있게 유지했습니다.
-- 인증 전 HTML에는 비공개 항목 제목·본문을 넣지 않고, 패스키 인증 뒤 `/api/private-items`에서 받은 값만 `textContent`로 렌더링합니다.
-- SimpleWebAuthn 등록·인증 옵션/검증 API, 서명된 `HttpOnly` 세션 쿠키, 로그아웃 API를 추가했습니다.
-- 최초 패스키 등록은 32자 이상의 `PASSKEY_SETUP_SECRET` 또는 이미 인증된 세션이 있어야 가능합니다.
-- `SESSION_SECRET`이 없을 때 credential 저장이나 인증 카운터 갱신까지 진행된 뒤 실패하던 순서를 수정했습니다. 이제 등록·인증 옵션 발급 단계에서 `503`으로 중단해 모바일과 Neon 사이에 불완전한 상태가 생기지 않게 합니다.
-- 운영 `/api/private-items`의 500 원인은 API가 조회한 `updated_at` 컬럼이 기존 `private_items`에 없기 때문임을 Neon 메타데이터 조회로 확인했습니다.
-- 기존 `private_items`에는 UUID `account_id` 기준 2개 계정·6개 행이 있어 단순 호환 조회 시 다른 계정 자료까지 노출될 수 있으므로, 해당 테이블은 수정하지 않고 패스키 공간 전용 `passkey_private_items`로 분리했습니다.
-- 운영에 적용할 수 있도록 `db/migrations/20260928_create_passkey_private_items.sql`과 레거시 제거용 `db/migrations/20260928_remove_legacy_passkey_tables.sql`을 추가했습니다. 두 변경은 운영 Neon에 실행했고, 전용 테이블에 자리표시자 3행이 생성된 것을 확인했습니다.
-- Neon에 패스키 credential, 5분짜리 일회용 챌린지, 비공개 항목을 저장하는 `db/schema.sql`을 추가했습니다.
-- 비공개 항목은 준비 중인 프로젝트 메모, 지원하려는 곳 목록, 스스로 쓰는 회고의 세 종류로 정했습니다.
-- 비인증 비공개 API는 DB 접속 전에 `401`, 등록 권한이 없으면 `403`을 반환하도록 만들었습니다.
-- `docs/card1`에 공개/비공개 경계 화면과 비인증 응답 본문을 남겼습니다.
-- README에 설치, Neon 초기화, 환경변수, Vercel 배포 뒤 최초 등록 및 부트스트랩 비밀값 제거 순서를 기록했습니다.
+- 운영 Chrome에서 Google 비밀번호 관리자 패스키 인증에 성공하고 비공개 자료 반환을 확인했습니다.
+- 운영 패스키 목록에서 3개 credential과 저장 위치를 확인했습니다. 2개는 `휴대폰 또는 동기화된 패스키 관리자`, 1개는 `이 기기의 Windows Hello 또는 기기 잠금`입니다.
+- 운영 Neon에서 세 credential의 77바이트 COSE 공개키를 읽기 전용으로 확인하고 `docs/card2/README.md`에 기록했습니다. credential ID·쿠키·비밀값은 기록하지 않았습니다.
+- 등록 challenge를 두 번 발급한 뒤 Neon 집계에서 활성 2개·서로 다른 값 2개·5분 만료를 확인했습니다. challenge 원문과 ceremony ID는 기록하지 않았습니다.
+- 운영에서 등록 취소 전후 패스키 수가 3개로 동일해 credential 미저장을 확인했습니다. 다만 영어 WebAuthn 오류가 그대로 노출되고 임시 challenge가 만료 때까지 남는 문제를 확인했습니다.
+- 패스키 등록 시 1~40자 이름을 서버에 저장하고, 기존 패스키도 관리 화면에서 이름을 변경할 수 있도록 로컬 구현했습니다.
+- 기존 credential에 이름을 채우는 `db/migrations/20260928_add_passkey_display_name.sql`을 추가했습니다. 운영 DB에는 아직 실행하지 않았습니다.
+- 취소·포커스 실패 시 한국어 안내를 표시하고 해당 임시 challenge를 즉시 폐기하는 API와 클라이언트 처리를 추가했습니다.
+- 등록 요청·응답의 가린 구조와 T08-C19~C26 판정표를 `docs/card2`에 추가했습니다.
 
 ## 주요 수정 파일
 
-- `index.html`, `styles.css`, `script.js`: 공개/비공개 경계와 잠금 UI
-- `setup/index.html`, `setup.js`: 공개 소개와 분리된 최초 패스키 설정 화면
-- `passkey-client.js`, `scripts/build.mjs`: 공통 WebAuthn ceremony와 Vite 멀티페이지 빌드
-- `api/passkey/*.js`: 등록·인증·상태 확인·로그아웃 Vercel 함수
-- `api/private-items.js`: 세션 확인 뒤에만 Neon 자료를 반환하는 API
-- `api/_lib/*.js`: DB, 챌린지, 설정, HTTP 응답, 세션 공통 모듈
-- `db/schema.sql`, `db/migrations/*.sql`: Neon 스키마, 전용 비공개 테이블, 안전한 초기 자리표시자와 레거시 테이블 정리
-- `tests/private-boundary.test.js`: 401/403, 캐시 금지, 공개 빌드 누출 검사
-- `docs/card1/public-private-boundary.png`: 데스크톱 잠금 화면 캡처
-- `docs/card1/unauthenticated-private-response.json`: 비인증 응답 계약 캡처
-- `.env.example`, `package.json`, `package-lock.json`, `vercel.json`: 실행·배포 구성
-- `README.md`: 운영 설정과 검증 경계 문서
+- `api/_lib/passkey-name.js`, `api/passkey/register-verify.js`, `api/passkey/credentials.js`: 패스키 이름 검증·저장·조회·변경
+- `index.html`, `setup/index.html`, `script.js`, `setup.js`, `passkey-client.js`, `styles.css`: 이름 입력·변경 UI와 취소 안내
+- `api/passkey/challenge-cancel.js`, `api/_lib/challenges.js`: 취소된 ceremony challenge 즉시 폐기
+- `db/schema.sql`, `db/migrations/20260928_add_passkey_display_name.sql`: `display_name` 컬럼과 기존 행 이름 채움
+- `tests/private-boundary.test.js`: 이름·취소 보완 회귀 검사
+- `docs/card2/README.md`, `docs/card2/registration-request-shape.json`: 운영 검증 결과와 등록 본문 구조
+- `README.md`: 이름 마이그레이션과 challenge 취소 정책
 
 ## 실행한 검사와 실제 결과
 
@@ -50,46 +36,53 @@
 - `npm test`
   - Vite 7.3.6 프로덕션 빌드 성공
   - 기존 학습 이미지 6장 모두 빌드 산출물에 포함됨
-  - Node 테스트 10개 통과, 실패 0개
-  - 비인증 `/api/private-items` 응답 `401` 및 본문 확인
-  - 권한 없는 패스키 등록 응답 `403` 확인
-  - 공개 `dist/index.html`과 번들 JS에 세 비공개 항목 문구가 없음을 확인
-  - 비공개·인증 응답의 `Cache-Control: no-store` 확인
-  - 공개 잠금 패널에 최초 설정 코드 입력이 없음을 확인
-  - 최초 설정 코드 재사용 `409` 정책과 추가 등록의 인증 세션 요구 확인
-  - credential이 없을 때 `패스키로 열기`가 같은 페이지의 등록 ceremony를 시작하는 분기 확인
-  - `SESSION_SECRET` 누락 시 credential 생성 전에 `503`으로 중단하는 회귀 검사 확인
-  - 패스키 자료 API가 기존 계정 자료 테이블이 아닌 `passkey_private_items`만 읽는지 확인
-- `node --check`를 `api/**/*.js` 전체에 실행: 모두 통과
-- `node`로 `package.json`, `vercel.json` JSON 파싱: 통과
+  - Node 테스트 18개 통과, 실패 0개
+  - 기존 401/403, 캐시 금지, 공개 빌드 비공개 자료 미포함, 등록 권한, 세션 설정 검사를 포함
+  - 패스키 이름 1~40자 정규화·저장 경로·목록 반환·이름 변경 경로 확인
+  - 등록 취소 한국어 안내와 challenge 폐기 경로 확인
+- `node --check`를 `api/**/*.js`, `script.js`, `setup.js`, `passkey-client.js`에 실행: 모두 통과
 - `git diff --check`: 오류 없음(CRLF 변환 경고만 있음)
-- 브라우저 렌더링 확인: 공개 잠금 화면과 별도 `/setup` 진입 확인, `/setup` 390×844에서 가로 넘침 없음(`scrollWidth=390`)과 단일 열 폼 확인
-- `npm install` 결과: 알려진 취약점 0건
 
-### 확인 과정의 제한
+### 검사 환경 제한
 
-- 관리형 샌드박스에서는 Vite 개발 서버가 상위 디렉터리 열람 권한 오류로 시작되지 않았습니다. 프로덕션 빌드와 `vite preview`는 성공했고, 화면 검증은 빌드 결과의 preview 서버에서 수행했습니다.
-
-## 아직 확인하지 못한 항목
-
-- 전체 `db/schema.sql`을 운영 Neon에 다시 실행하지는 않았지만, 이번 변경에 필요한 전용 테이블 생성·자리표시자 삽입·레거시 테이블 제거 마이그레이션은 실행했습니다.
-- 실제 Vercel 환경변수를 등록하거나 배포하지 않았습니다.
-- 운영 도메인의 RP ID/Origin에서 Windows Hello, Touch ID 또는 보안 키로 등록·로그인하지 않았습니다.
-- Windows Hello·휴대폰·패스키 관리자 선택 창과 credential 저장은 정적 preview에서 실행하지 못했습니다.
-- 운영 배포의 비인증 API가 `401`을 반환하는지, 실제 HTTP 응답 소스에 Neon의 비공개 내용이 없는지 확인하지 않았습니다.
-- 실제 비공개 개인 내용은 자리표시자이며 Neon에서 사용자가 입력해야 합니다.
+- 샌드박스 내부 `npm test`는 Vite의 하위 프로세스 실행에서 `spawn EPERM`으로 중단됐고, 승인된 권한 환경에서 동일 명령을 다시 실행해 통과했습니다.
 
 ### 운영에서 확인한 상태
 
-- `https://aleph-task-t01.vercel.app/api/passkey/status`를 읽기 전용으로 확인한 결과 `registrationAvailable: false`였습니다. 모바일뿐 아니라 Neon에도 첫 credential이 남아 있으므로, 삭제보다 `SESSION_SECRET` 등록·재배포 후 기존 패스키 인증을 먼저 시도해야 합니다.
-- 로컬 `.env.local`의 Neon 연결로 값이 아닌 메타데이터만 조회한 뒤, 기존 `private_items`와 연결된 레거시 `passkey_accounts`, `passkeys`, `passkey_challenges`, `passkey_sessions`를 외부 의존성 없이 제거했습니다. 새 `passkey_private_items`에는 자리표시자 3행이 있습니다.
+- Chrome의 Google 비밀번호 관리자 패스키로 운영 로그인에 성공했습니다.
+- `GET /api/passkey/status`: `200`, `{"registrationAvailable":false}`.
+- 비인증 `GET /api/passkey/credentials`: `401`, `{"error":"패스키 인증이 필요합니다."}`.
+- 인증된 패스키 목록: 3개. Google 비밀번호 관리자/휴대폰 계열 2개, Windows Hello/기기 잠금 계열 1개.
+- 등록 취소 전후 credential 수: 3개로 동일. 현재 배포는 영어 취소 오류를 표시하므로 로컬 보완 배포 뒤 재검증이 필요합니다.
+- Neon `passkey_credentials`: 3행 모두 `public_key` 77바이트. 실제 Base64 값은 `docs/card2/README.md`에 기록했습니다.
+- Neon `webauthn_challenges`: 두 등록 요청 후 활성 2행, distinct challenge 2개, 각각 생성 후 약 5분 만료.
+
+## 아직 확인하지 못한 항목
+
+- `db/migrations/20260928_add_passkey_display_name.sql`은 운영 Neon에 실행하지 않았습니다.
+- 이름·취소 보완 코드는 운영 Vercel에 배포하지 않았습니다.
+- 운영 배포 뒤 사람이 붙인 패스키 이름과 한국어 취소 안내는 아직 확인하지 않았습니다.
+- 과거 실제 등록 Network 요청 본문은 저장되지 않아 `docs/card2/registration-request-shape.json`은 코드에서 도출한 가림 구조입니다. 다음 신규 등록 시 실제 Network 원문을 캡처해야 합니다.
+- 인증된 패스키 목록 화면은 브라우저에서 확인했지만 저장소 이미지 파일로 저장하지 못했습니다.
+- 실제 비공개 개인 내용은 여전히 자리표시자입니다.
 
 ## 다음 작업자가 바로 실행할 순서
 
-1. Vercel에 이 변경을 배포해 `/api/private-items`가 `passkey_private_items`를 읽도록 합니다.
-2. Vercel에 `.env.example`의 환경변수를 실제 값으로 설정합니다. 비밀값은 로그나 문서에 남기지 않습니다.
-3. Vercel에 배포한 뒤 운영 URL과 `PASSKEY_RP_ID`, `PASSKEY_ORIGIN`이 정확히 일치하는지 확인합니다.
-4. 공개 화면의 `패스키로 열기`를 눌러 같은 페이지의 일회용 소유자 확인을 마친 뒤 Windows Hello 또는 휴대폰 저장 위치가 바로 열리는지 확인하고, 로그아웃 → 패스키 로그인을 검증합니다. `/setup`은 예비 경로로만 확인합니다.
-5. 첫 등록 성공 뒤 `PASSKEY_SETUP_SECRET`을 Vercel에서 제거하고 재배포해 등록 부트스트랩을 닫습니다.
-6. 쿠키 없는 `GET /api/private-items`가 `401` 또는 `403`인지 확인하고, 운영 HTML/JS 응답에서 실제 비공개 문구를 검색합니다.
-7. 운영 증거가 확보되면 `docs/card1/unauthenticated-private-response.json`의 로컬 계약 증거와 구분해 실제 응답 캡처를 추가합니다.
+1. `db/migrations/20260928_add_passkey_display_name.sql`을 운영 Neon에 실행합니다. 코드 배포 직전에 수행해 구버전 등록 API가 `NOT NULL` 제약에 걸리는 시간을 최소화합니다.
+2. 이번 변경을 배포합니다. 저장소 규칙에 따라 아래 제안 커밋 메시지를 사용자가 직접 커밋·푸시합니다.
+3. 운영 Chrome에서 기존 패스키로 로그인하고 `패스키 관리`에서 세 패스키를 실제 기기 기준 이름으로 변경합니다.
+4. 이름과 저장 위치가 함께 보이는 목록 화면을 `docs/card2`에 캡처합니다.
+5. `패스키 추가`를 시작한 뒤 취소하여 한국어 안내가 보이고 목록이 3개로 유지되는지 확인·캡처합니다. Neon에서 해당 challenge가 즉시 사라졌는지도 조회합니다.
+6. 실제 신규 등록이 필요할 때 DevTools Network의 `/api/passkey/register-options` 및 `/api/passkey/register-verify` 요청·응답을 민감 값 `[가림]` 처리 후 저장합니다.
+
+## 제안 커밋 메시지
+
+```text
+feat: 패스키 이름 저장과 등록 취소 처리 추가
+
+- [Feat] 등록 시 패스키 이름을 저장하고 기존 패스키 이름 변경 지원
+- [Fix] 등록 취소 시 한국어 안내와 임시 challenge 즉시 폐기
+- [DB] 기존 credential에 이름을 채우는 마이그레이션 추가
+- [Docs] T08-C19~C26 운영 검증 결과와 공개키 증거 기록
+- [Test] 패스키 이름과 취소 처리 회귀 검사 추가
+```

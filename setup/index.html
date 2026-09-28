@@ -17,6 +17,8 @@
         <p class="setup-lead">이 페이지는 아직 패스키가 하나도 없을 때만 사용할 수 있습니다. 등록을 시작하면 브라우저가 Windows Hello, 휴대폰 또는 패스키 관리자를 선택할 수 있는 기본 창을 엽니다.</p>
 
         <div class="setup-form" data-setup-form>
+          <label for="setup-passkey-name">패스키 이름</label>
+          <input id="setup-passkey-name" name="setup-passkey-name" type="text" maxlength="40" autocomplete="off" placeholder="예: 내 노트북 Windows Hello" data-setup-name />
           <label for="setup-code">일회용 설정 코드</label>
           <input id="setup-code" name="setup-code" type="password" autocomplete="one-time-code" data-setup-code />
           <button type="button" data-setup-register>기기 패스키 등록 시작</button>

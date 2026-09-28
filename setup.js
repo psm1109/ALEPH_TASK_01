@@ -4,6 +4,7 @@ import { requestJson, runPasskeyCeremony } from './passkey-client.js';
 const setupForm = document.querySelector('[data-setup-form]');
 const setupComplete = document.querySelector('[data-setup-complete]');
 const setupCodeInput = document.querySelector('[data-setup-code]');
+const setupNameInput = document.querySelector('[data-setup-name]');
 const setupRegisterButton = document.querySelector('[data-setup-register]');
 const setupMessage = document.querySelector('[data-setup-message]');
 
@@ -29,6 +30,12 @@ const loadSetupStatus = async () => {
 
 setupRegisterButton.addEventListener('click', async () => {
   const setupCode = setupCodeInput.value;
+  const displayName = setupNameInput.value.trim();
+  if (!displayName) {
+    setSetupMessage('패스키 이름을 입력해 주세요.', true);
+    setupNameInput.focus();
+    return;
+  }
   if (!setupCode) {
     setSetupMessage('일회용 설정 코드를 입력해 주세요.', true);
     setupCodeInput.focus();
@@ -38,8 +45,9 @@ setupRegisterButton.addEventListener('click', async () => {
   setupRegisterButton.disabled = true;
   setSetupMessage('기기에서 패스키 저장 위치를 선택해 주세요.');
   try {
-    await runPasskeyCeremony('register', setupCode);
+    await runPasskeyCeremony('register', { setupCode, displayName });
     setupCodeInput.value = '';
+    setupNameInput.value = '';
     showSetupComplete();
     setSetupMessage('패스키 등록을 완료했습니다.');
   } catch (error) {

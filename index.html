@@ -10,8 +10,7 @@
     <script type="module" src="script.js"></script>
   </head>
   <body id="top">
-    <a class="skip-link" href="#main">본문으로 건너뛰기</a>
-
+    <!-- <a class="skip-link" href="#main">본문으로 건너뛰기</a> -->
     <header class="site-header">
       <a class="wordmark" href="#top" aria-label="Aleph 홈"></a>
       <nav aria-label="주요 메뉴">
@@ -270,6 +269,8 @@
         <p class="private-eyebrow">ONE-TIME OWNER CHECK</p>
         <h2 id="passkey-bootstrap-title">첫 패스키 등록</h2>
         <p>최초 소유자 확인 후 Windows가 패스키 저장 위치 선택 창을 바로 엽니다.</p>
+        <label for="bootstrap-passkey-name">패스키 이름</label>
+        <input id="bootstrap-passkey-name" name="bootstrap-passkey-name" type="text" maxlength="40" autocomplete="off" placeholder="예: 내 노트북 Windows Hello" data-passkey-bootstrap-name />
         <label for="bootstrap-setup-code">일회용 설정 코드</label>
         <input id="bootstrap-setup-code" name="bootstrap-setup-code" type="password" autocomplete="one-time-code" data-passkey-bootstrap-code />
         <div class="passkey-dialog-actions">

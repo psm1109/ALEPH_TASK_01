@@ -3,6 +3,7 @@ import { consumeChallenge } from '../_lib/challenges.js';
 import { getPasskeyConfig } from '../_lib/config.js';
 import { getSql } from '../_lib/db.js';
 import { logServerError, methodAllowed, readJsonBody, sendJson } from '../_lib/http.js';
+import { normalizePasskeyName } from '../_lib/passkey-name.js';
 import { getRegistrationAccess } from '../_lib/registration-access.js';
 import { createSessionCookie, hasSetupAccess, hasValidSession, isSessionConfigured } from '../_lib/session.js';
 
@@ -33,7 +34,12 @@ export default async function handler(request, response) {
       return;
     }
 
-    const { ceremonyId, credential } = readJsonBody(request);
+    const { ceremonyId, credential, displayName } = readJsonBody(request);
+    const passkeyName = normalizePasskeyName(displayName);
+    if (!passkeyName) {
+      sendJson(response, 400, { error: '패스키 이름을 1~40자로 입력해 주세요.' });
+      return;
+    }
     const challenge = await consumeChallenge(ceremonyId, 'registration');
     if (!challenge || !credential) {
       sendJson(response, 400, { error: '등록 요청이 만료되었거나 올바르지 않습니다.' });
@@ -56,10 +62,10 @@ export default async function handler(request, response) {
     const { credential: passkey, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
     await sql`
       INSERT INTO passkey_credentials (
-        credential_id, public_key, counter, transports, device_type, backed_up,
+        credential_id, display_name, public_key, counter, transports, device_type, backed_up,
         webauthn_user_id, bootstrap_registration
       ) VALUES (
-        ${passkey.id}, ${Buffer.from(passkey.publicKey)}, ${passkey.counter},
+        ${passkey.id}, ${passkeyName}, ${Buffer.from(passkey.publicKey)}, ${passkey.counter},
         ${JSON.stringify(passkey.transports || [])}::jsonb, ${credentialDeviceType},
         ${credentialBackedUp}, ${challenge.webauthn_user_id}, ${registrationAccess.bootstrap}
       )

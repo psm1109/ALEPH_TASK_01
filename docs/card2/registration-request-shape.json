@@ -1,0 +1,24 @@
+{
+  "recordType": "implementation-derived-redacted-shape",
+  "note": "Historical browser request bodies were not persisted. This shape is generated from passkey-client.js and SimpleWebAuthn's WebAuthn registration response fields.",
+  "request": {
+    "ceremonyId": "[가림: 일회용 서버 식별자]",
+    "displayName": "내 휴대전화 Google 비밀번호 관리자",
+    "credential": {
+      "id": "[가림: credential ID]",
+      "rawId": "[가림: credential ID]",
+      "response": {
+        "clientDataJSON": "[가림: challenge와 origin을 포함한 서명 대상 데이터]",
+        "attestationObject": "[가림: 공개키와 인증기 데이터]",
+        "transports": ["hybrid", "internal"]
+      },
+      "type": "public-key",
+      "clientExtensionResults": {},
+      "authenticatorAttachment": "cross-platform"
+    }
+  },
+  "response": {
+    "verified": true
+  },
+  "privateKeyFieldPresent": false
+}

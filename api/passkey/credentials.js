@@ -1,11 +1,12 @@
 import { describePasskeyLocation } from '../_lib/passkey-metadata.js';
+import { normalizePasskeyName } from '../_lib/passkey-name.js';
 import { getSql } from '../_lib/db.js';
 import { logServerError, readJsonBody, sendJson } from '../_lib/http.js';
 import { hasValidSession } from '../_lib/session.js';
 
 function methodAllowed(request, response) {
-  if (request.method === 'GET' || request.method === 'DELETE') return true;
-  response.setHeader('Allow', 'GET, DELETE');
+  if (request.method === 'GET' || request.method === 'PATCH' || request.method === 'DELETE') return true;
+  response.setHeader('Allow', 'GET, PATCH, DELETE');
   sendJson(response, 405, { error: '허용되지 않은 요청 방식입니다.' });
   return false;
 }
@@ -22,15 +23,15 @@ export default async function handler(request, response) {
 
     if (request.method === 'GET') {
       const credentials = await sql`
-        SELECT credential_id, transports, device_type, backed_up,
+        SELECT credential_id, display_name, transports, device_type, backed_up,
                bootstrap_registration, created_at, last_used_at
         FROM passkey_credentials
         ORDER BY created_at ASC
       `;
       sendJson(response, 200, {
-        passkeys: credentials.map((credential, index) => ({
+        passkeys: credentials.map((credential) => ({
           id: credential.credential_id,
-          name: `패스키 ${index + 1}`,
+          name: credential.display_name,
           location: describePasskeyLocation({
             transports: credential.transports,
             deviceType: credential.device_type,
@@ -45,9 +46,29 @@ export default async function handler(request, response) {
       return;
     }
 
-    const { credentialId } = readJsonBody(request);
+    const { credentialId, displayName } = readJsonBody(request);
     if (typeof credentialId !== 'string' || !credentialId) {
-      sendJson(response, 400, { error: '삭제할 패스키를 선택해 주세요.' });
+      sendJson(response, 400, { error: '패스키를 선택해 주세요.' });
+      return;
+    }
+
+    if (request.method === 'PATCH') {
+      const passkeyName = normalizePasskeyName(displayName);
+      if (!passkeyName) {
+        sendJson(response, 400, { error: '패스키 이름을 1~40자로 입력해 주세요.' });
+        return;
+      }
+      const renamed = await sql`
+        UPDATE passkey_credentials
+        SET display_name = ${passkeyName}
+        WHERE credential_id = ${credentialId}
+        RETURNING credential_id
+      `;
+      if (renamed.length === 0) {
+        sendJson(response, 404, { error: '패스키를 찾을 수 없습니다.' });
+        return;
+      }
+      sendJson(response, 200, { renamed: true, name: passkeyName });
       return;
     }
 
