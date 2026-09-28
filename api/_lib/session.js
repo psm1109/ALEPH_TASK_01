@@ -46,7 +46,8 @@ function readSession(request) {
     const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
     const expiresAtSeconds = Number(payload.exp);
     if (
-      payload.sub !== 'owner'
+      typeof payload.sub !== 'string'
+      || !payload.sub
       || typeof payload.sid !== 'string'
       || payload.sid.length < 32
       || !Number.isFinite(expiresAtSeconds)
@@ -54,13 +55,14 @@ function readSession(request) {
     ) return null;
     return {
       sessionIdHash: hashSessionId(payload.sid),
+      accountId: payload.sub,
     };
   } catch {
     return null;
   }
 }
 
-export async function createSession(sql = null) {
+export async function createSession(sql = null, accountId = 'owner') {
   const secret = process.env.SESSION_SECRET;
   if (!isSessionConfigured()) throw new Error('SESSION_SECRET must be at least 32 characters');
   const database = sql || getSql();
@@ -68,7 +70,7 @@ export async function createSession(sql = null) {
   const sessionId = randomBytes(32).toString('base64url');
   const expiresAt = new Date(Date.now() + SESSION_SECONDS * 1000);
   const encodedPayload = Buffer.from(JSON.stringify({
-    sub: 'owner',
+    sub: accountId,
     sid: sessionId,
     exp: Math.floor(expiresAt.getTime() / 1000),
   })).toString('base64url');
@@ -76,8 +78,8 @@ export async function createSession(sql = null) {
 
   await database`DELETE FROM passkey_sessions WHERE expires_at <= now()`;
   await database`
-    INSERT INTO passkey_sessions (session_id_hash, expires_at)
-    VALUES (${hashSessionId(sessionId)}, ${expiresAt})
+    INSERT INTO passkey_sessions (session_id_hash, account_id, expires_at)
+    VALUES (${hashSessionId(sessionId)}, ${accountId}, ${expiresAt})
   `;
 
   return `${COOKIE_NAME}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_SECONDS}`;
@@ -87,19 +89,24 @@ export function clearSessionCookie() {
   return `${COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`;
 }
 
-export async function hasValidSession(request, sql = null) {
+export async function getSessionAccountId(request, sql = null) {
   const session = readSession(request);
-  if (!session) return false;
+  if (!session) return null;
 
   const database = sql || getSql();
   const rows = await database`
-    SELECT 1
+    SELECT account_id
     FROM passkey_sessions
     WHERE session_id_hash = ${session.sessionIdHash}
+      AND account_id = ${session.accountId}
       AND expires_at > now()
     LIMIT 1
   `;
-  return rows.length > 0;
+  return rows[0]?.account_id || null;
+}
+
+export async function hasValidSession(request, sql = null) {
+  return Boolean(await getSessionAccountId(request, sql));
 }
 
 export async function revokeSession(request, sql = null) {

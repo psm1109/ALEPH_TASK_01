@@ -340,6 +340,26 @@ addPasskeyButton.addEventListener('click', async () => {
   }
 });
 
+document.querySelector('[data-passkey-new-account]').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  const displayName = window.prompt('새 검증 계정의 패스키 이름을 입력해 주세요.');
+  if (displayName === null) return;
+  if (!displayName.trim() || displayName.trim().length > 40) {
+    setPrivateMessage('패스키 이름을 1~40자로 입력해 주세요.', true);
+    return;
+  }
+  button.disabled = true;
+  try {
+    await runPasskeyCeremony('register', { displayName, newAccount: true });
+    await loadPrivateItems();
+    setPrivateMessage('새 검증 계정으로 전환했습니다. 잠근 뒤 각 패스키로 자료를 확인해 주세요.');
+  } catch (error) {
+    setPrivateMessage(error.message, true);
+  } finally {
+    button.disabled = false;
+  }
+});
+
 managePasskeysButton.addEventListener('click', async () => {
   managePasskeysButton.disabled = true;
   managePasskeysDialog.showModal();

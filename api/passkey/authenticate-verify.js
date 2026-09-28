@@ -22,7 +22,7 @@ export default async function handler(request, response) {
 
     const sql = getSql();
     const rows = await sql`
-      SELECT credential_id, public_key, counter, transports
+      SELECT credential_id, account_id, public_key, counter, transports
       FROM passkey_credentials
       WHERE credential_id = ${credential.id}
     `;
@@ -56,7 +56,7 @@ export default async function handler(request, response) {
       SET counter = ${verification.authenticationInfo.newCounter}, last_used_at = now()
       WHERE credential_id = ${stored.credential_id}
     `;
-    response.setHeader('Set-Cookie', await createSession(sql));
+    response.setHeader('Set-Cookie', await createSession(sql, stored.account_id));
     sendJson(response, 200, { verified: true });
   } catch (error) {
     logServerError('authenticate-verify', error);

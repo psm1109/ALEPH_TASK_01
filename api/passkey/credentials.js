@@ -2,7 +2,7 @@ import { describePasskeyLocation } from '../_lib/passkey-metadata.js';
 import { normalizePasskeyName } from '../_lib/passkey-name.js';
 import { getSql } from '../_lib/db.js';
 import { logServerError, readJsonBody, sendJson } from '../_lib/http.js';
-import { hasValidSession } from '../_lib/session.js';
+import { getSessionAccountId } from '../_lib/session.js';
 
 function methodAllowed(request, response) {
   if (request.method === 'GET' || request.method === 'PATCH' || request.method === 'DELETE') return true;
@@ -14,7 +14,8 @@ function methodAllowed(request, response) {
 export default async function handler(request, response) {
   if (!methodAllowed(request, response)) return;
   try {
-    if (!await hasValidSession(request)) {
+    const accountId = await getSessionAccountId(request);
+    if (!accountId) {
       sendJson(response, 401, { error: '패스키 인증이 필요합니다.' });
       return;
     }
@@ -25,6 +26,7 @@ export default async function handler(request, response) {
         SELECT credential_id, display_name, transports, device_type, backed_up,
                bootstrap_registration, created_at, last_used_at
         FROM passkey_credentials
+        WHERE account_id = ${accountId}
         ORDER BY created_at ASC
       `;
       sendJson(response, 200, {
@@ -60,7 +62,7 @@ export default async function handler(request, response) {
       const renamed = await sql`
         UPDATE passkey_credentials
         SET display_name = ${passkeyName}
-        WHERE credential_id = ${credentialId}
+        WHERE credential_id = ${credentialId} AND account_id = ${accountId}
         RETURNING credential_id
       `;
       if (renamed.length === 0) {
@@ -72,11 +74,11 @@ export default async function handler(request, response) {
     }
 
     const [credentials, deleted] = await sql.transaction((transaction) => [
-      transaction`SELECT credential_id FROM passkey_credentials FOR UPDATE`,
+      transaction`SELECT credential_id FROM passkey_credentials WHERE account_id = ${accountId} FOR UPDATE`,
       transaction`
         DELETE FROM passkey_credentials
-        WHERE credential_id = ${credentialId}
-          AND (SELECT count(*) FROM passkey_credentials) > 1
+        WHERE credential_id = ${credentialId} AND account_id = ${accountId}
+          AND (SELECT count(*) FROM passkey_credentials WHERE account_id = ${accountId}) > 1
         RETURNING credential_id
       `,
     ]);

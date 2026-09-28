@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS passkey_credentials (
   device_type text NOT NULL,
   backed_up boolean NOT NULL DEFAULT false,
   webauthn_user_id bytea NOT NULL,
+  account_id text NOT NULL DEFAULT 'owner',
   bootstrap_registration boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
   last_used_at timestamptz
@@ -51,6 +52,8 @@ CREATE TABLE IF NOT EXISTS webauthn_challenges (
   ceremony_type text NOT NULL CHECK (ceremony_type IN ('registration', 'authentication')),
   challenge text NOT NULL,
   webauthn_user_id bytea,
+  account_id text,
+  source_account_id text,
   expires_at timestamptz NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -60,6 +63,7 @@ CREATE INDEX IF NOT EXISTS webauthn_challenges_expires_at_idx
 
 CREATE TABLE IF NOT EXISTS passkey_sessions (
   session_id_hash text PRIMARY KEY,
+  account_id text NOT NULL DEFAULT 'owner',
   expires_at timestamptz NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -69,6 +73,7 @@ CREATE INDEX IF NOT EXISTS passkey_sessions_expires_at_idx
 
 CREATE TABLE IF NOT EXISTS passkey_private_items (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  account_id text NOT NULL DEFAULT 'owner',
   category text NOT NULL,
   title text NOT NULL,
   body text NOT NULL,
@@ -79,11 +84,11 @@ CREATE TABLE IF NOT EXISTS passkey_private_items (
 
 -- 실제 개인 내용은 이 파일에 쓰지 말고, Neon 콘솔에서 아래 예시의 값을 바꿔 입력합니다.
 -- 이 세 행은 비공개 공간이 비어 있지 않도록 만드는 안전한 초기 자리표시자입니다.
-INSERT INTO passkey_private_items (category, title, body, sort_order)
-SELECT seed.category, seed.title, seed.body, seed.sort_order
+INSERT INTO passkey_private_items (account_id, category, title, body, sort_order)
+SELECT 'owner', seed.category, seed.title, seed.body, seed.sort_order
 FROM (VALUES
   ('프로젝트', '준비 중인 프로젝트 메모', 'Neon 콘솔에서 이 문장을 실제 메모로 교체하세요.', 1),
   ('지원', '지원하려는 곳 목록', 'Neon 콘솔에서 이 문장을 실제 목록으로 교체하세요.', 2),
   ('회고', '스스로 쓰는 회고', 'Neon 콘솔에서 이 문장을 실제 회고로 교체하세요.', 3)
 ) AS seed(category, title, body, sort_order)
-WHERE NOT EXISTS (SELECT 1 FROM passkey_private_items);
+WHERE NOT EXISTS (SELECT 1 FROM passkey_private_items WHERE account_id = 'owner');

@@ -5,12 +5,13 @@ import { getSql } from '../_lib/db.js';
 import { logServerError, methodAllowed, readJsonBody, sendJson } from '../_lib/http.js';
 import { normalizePasskeyName } from '../_lib/passkey-name.js';
 import { getRegistrationAccess } from '../_lib/registration-access.js';
-import { createSession, hasSetupAccess, hasValidSession, isSessionConfigured } from '../_lib/session.js';
+import { createSession, getSessionAccountId, hasSetupAccess, isSessionConfigured } from '../_lib/session.js';
 
 export default async function handler(request, response) {
   if (!methodAllowed(request, response, 'POST')) return;
   try {
-    const sessionAuthorized = await hasValidSession(request);
+    const sessionAccountId = await getSessionAccountId(request);
+    const sessionAuthorized = Boolean(sessionAccountId);
     const setupAuthorized = hasSetupAccess(request);
     const initialAccess = getRegistrationAccess({ sessionAuthorized, setupAuthorized, hasCredential: false });
     if (!initialAccess.allowed) {
@@ -45,6 +46,10 @@ export default async function handler(request, response) {
       sendJson(response, 400, { error: '등록 요청이 만료되었거나 올바르지 않습니다.' });
       return;
     }
+    if (challenge.source_account_id !== sessionAccountId || !challenge.account_id) {
+      sendJson(response, 403, { error: '등록을 시작한 계정의 세션이 필요합니다.' });
+      return;
+    }
 
     const config = getPasskeyConfig();
     const verification = await verifyRegistrationResponse({
@@ -63,14 +68,22 @@ export default async function handler(request, response) {
     await sql`
       INSERT INTO passkey_credentials (
         credential_id, display_name, public_key, counter, transports, device_type, backed_up,
-        webauthn_user_id, bootstrap_registration
+        webauthn_user_id, account_id, bootstrap_registration
       ) VALUES (
         ${passkey.id}, ${passkeyName}, ${Buffer.from(passkey.publicKey)}, ${passkey.counter},
         ${JSON.stringify(passkey.transports || [])}::jsonb, ${credentialDeviceType},
-        ${credentialBackedUp}, ${challenge.webauthn_user_id}, ${registrationAccess.bootstrap}
+        ${credentialBackedUp}, ${challenge.webauthn_user_id},
+        ${challenge.account_id}, ${registrationAccess.bootstrap}
       )
     `;
-    response.setHeader('Set-Cookie', await createSession(sql));
+    if (challenge.account_id !== sessionAccountId && !registrationAccess.bootstrap) {
+      await sql`
+        INSERT INTO passkey_private_items (account_id, category, title, body, sort_order)
+        VALUES (${challenge.account_id}, '검증', '두 번째 계정의 가상 기록',
+          '계정 분리 확인을 위해 만든 자료입니다. 실제 개인정보가 아닙니다.', 1)
+      `;
+    }
+    response.setHeader('Set-Cookie', await createSession(sql, challenge.account_id));
     sendJson(response, 200, { verified: true });
   } catch (error) {
     logServerError('register-verify', error);

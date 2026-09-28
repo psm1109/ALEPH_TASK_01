@@ -34,14 +34,14 @@ export const requestJson = async (url, options = {}) => {
   return payload;
 };
 
-export const runPasskeyCeremony = async (kind, { setupCode = '', displayName = '' } = {}) => {
+export const runPasskeyCeremony = async (kind, { setupCode = '', displayName = '', newAccount = false } = {}) => {
   const isRegistration = kind === 'register';
   const prefix = isRegistration ? 'register' : 'authenticate';
   const headers = setupCode ? { 'X-Passkey-Setup-Secret': setupCode } : {};
   const { options, ceremonyId } = await requestJson(`/api/passkey/${prefix}-options`, {
     method: 'POST',
     headers,
-    body: '{}',
+    body: JSON.stringify(isRegistration ? { newAccount } : {}),
   });
   let credential;
   try {

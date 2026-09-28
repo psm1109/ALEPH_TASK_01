@@ -2,13 +2,13 @@ import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { test } from 'node:test';
 import { getRegistrationAccess } from '../api/_lib/registration-access.js';
-import privateItemsHandler from '../api/private-items.js';
+import privateItemsHandler, { createPrivateItemsHandler, readPrivateItems } from '../api/private-items.js';
 import registerOptionsHandler from '../api/passkey/register-options.js';
 import credentialsHandler from '../api/passkey/credentials.js';
 import { describePasskeyLocation } from '../api/_lib/passkey-metadata.js';
 import { normalizePasskeyName } from '../api/_lib/passkey-name.js';
 import { describePasskeyClientError, shouldStartPasskeyRegistration } from '../passkey-client.js';
-import { clearSessionCookie, createSession, hasValidSession, revokeSession } from '../api/_lib/session.js';
+import { clearSessionCookie, createSession, getSessionAccountId, hasValidSession, revokeSession } from '../api/_lib/session.js';
 
 const PRIVATE_MARKERS = [
   '준비 중인 프로젝트 메모',
@@ -171,6 +171,55 @@ test('패스키 UI는 추가 capability가 아닌 WebAuthn API 지원 여부로 
   }
 });
 
+test('서로 다른 계정의 자료 번호를 지정해도 상대 자료는 반환하지 않는다', async () => {
+  const rows = [
+    { id: 1, account_id: 'owner', title: 'A의 가상 기록' },
+    { id: 2, account_id: 'account-b', title: 'B의 가상 기록' },
+  ];
+  const sql = async (strings, ...values) => {
+    const query = strings.join(' ');
+    assert.match(query, /WHERE account_id =/);
+    const accountId = values[0];
+    const itemId = query.includes('AND id =') ? Number(values[1]) : null;
+    return rows.filter((row) => row.account_id === accountId && (itemId === null || row.id === itemId));
+  };
+
+  assert.deepEqual((await readPrivateItems(sql, 'owner')).map((item) => item.id), [1]);
+  assert.deepEqual((await readPrivateItems(sql, 'account-b')).map((item) => item.id), [2]);
+  assert.deepEqual(await readPrivateItems(sql, 'owner', '2'), []);
+  assert.deepEqual(await readPrivateItems(sql, 'account-b', '1'), []);
+});
+
+test('비공개 API는 URL과 본문의 accountId를 무시하고 세션 계정으로 제한한다', async () => {
+  const rows = [
+    { id: 1, account_id: 'owner', title: 'A의 가상 기록' },
+    { id: 2, account_id: 'account-b', title: 'B의 가상 기록' },
+  ];
+  const sql = async (strings, ...values) => {
+    const query = strings.join(' ');
+    return rows.filter((row) => row.account_id === values[0]
+      && (!query.includes('AND id =') || row.id === Number(values[1])));
+  };
+  const handler = createPrivateItemsHandler({
+    resolveAccount: async (request) => request.testAccountId,
+    getDatabase: () => sql,
+  });
+  for (const [accountId, ownId, otherId] of [['owner', 1, 2], ['account-b', 2, 1]]) {
+    const forged = { method: 'GET', headers: {}, testAccountId: accountId,
+      query: { accountId: accountId === 'owner' ? 'account-b' : 'owner' },
+      body: { accountId: accountId === 'owner' ? 'account-b' : 'owner' } };
+    const own = createResponse();
+    await handler(forged, own);
+    assert.equal(own.statusCode, 200);
+    assert.deepEqual(JSON.parse(own.body).items.map((item) => item.id), [ownId]);
+
+    const cross = createResponse();
+    await handler({ ...forged, query: { itemId: String(otherId) } }, cross);
+    assert.equal(cross.statusCode, 404);
+    assert.deepEqual(JSON.parse(cross.body), { error: '자료를 찾을 수 없습니다.' });
+  }
+});
+
 test('패스키 등록 취소는 저장되지 않았다는 한국어 안내를 반환한다', async () => {
   const message = describePasskeyClientError({ name: 'NotAllowedError' }, true);
   const clientSource = await readFile(new URL('../passkey-client.js', import.meta.url), 'utf8');
@@ -233,8 +282,8 @@ test('패스키 등록과 목록 API는 사람이 알아볼 수 있는 이름을
 test('패스키 관리 화면은 마지막 credential 삭제를 서버에서 차단한다', async () => {
   const source = await readFile(new URL('../api/passkey/credentials.js', import.meta.url), 'utf8');
 
-  assert.equal(source.includes('(SELECT count(*) FROM passkey_credentials) > 1'), true);
-  assert.equal(source.includes('SELECT credential_id FROM passkey_credentials FOR UPDATE'), true);
+  assert.equal(source.includes('(SELECT count(*) FROM passkey_credentials WHERE account_id = ${accountId}) > 1'), true);
+  assert.equal(source.includes('WHERE account_id = ${accountId} FOR UPDATE'), true);
   assert.equal(source.includes('마지막 패스키는 삭제할 수 없습니다.'), true);
 });
 
@@ -249,7 +298,7 @@ test('로그인은 매번 새 challenge를 만들고 저장 공개키로 asserti
   assert.equal(verifySource.includes('expectedChallenge: challenge.challenge'), true);
   assert.equal(verifySource.includes('publicKey: new Uint8Array(stored.public_key)'), true);
   assert.equal(verifySource.includes('if (!verification.verified)'), true);
-  assert.equal(verifySource.includes('await createSession(sql)'), true);
+  assert.equal(verifySource.includes('await createSession(sql, stored.account_id)'), true);
   assert.equal(challengeSource.includes('DELETE FROM webauthn_challenges'), true);
 });
 
@@ -269,15 +318,16 @@ test('로그아웃은 세션 쿠키를 지우고 비밀번호 입력칸을 만�
 test('로그아웃한 세션만 폐기하고 같은 쿠키 재사용을 거절한다', async () => {
   const originalSessionSecret = process.env.SESSION_SECRET;
   process.env.SESSION_SECRET = 'test-only-session-secret-value-1234567890';
-  const storedSessionHashes = new Set();
+  const storedSessionHashes = new Map();
   const sql = async (strings, ...values) => {
     const query = strings.join(' ');
     if (query.includes('INSERT INTO passkey_sessions')) {
-      storedSessionHashes.add(values[0]);
+      storedSessionHashes.set(values[0], values[1]);
       return [];
     }
-    if (query.includes('SELECT 1') && query.includes('FROM passkey_sessions')) {
-      return storedSessionHashes.has(values[0]) ? [{ exists: 1 }] : [];
+    if (query.includes('SELECT account_id') && query.includes('FROM passkey_sessions')) {
+      const accountId = storedSessionHashes.get(values[0]);
+      return accountId === values[1] ? [{ account_id: accountId }] : [];
     }
     if (query.includes('RETURNING session_id_hash')) {
       const deleted = storedSessionHashes.delete(values[0]);
@@ -289,13 +339,15 @@ test('로그아웃한 세션만 폐기하고 같은 쿠키 재사용을 거절�
 
   try {
     const firstCookie = (await createSession(sql)).split(';')[0];
-    const secondCookie = (await createSession(sql)).split(';')[0];
+    const secondCookie = (await createSession(sql, 'account-b')).split(';')[0];
     const firstRequest = { headers: { cookie: firstCookie } };
     const secondRequest = { headers: { cookie: secondCookie } };
 
-    assert.equal([...storedSessionHashes].every((value) => /^[a-f0-9]{64}$/.test(value)), true);
+    assert.equal([...storedSessionHashes.keys()].every((value) => /^[a-f0-9]{64}$/.test(value)), true);
     assert.equal(await hasValidSession(firstRequest, sql), true);
     assert.equal(await hasValidSession(secondRequest, sql), true);
+    assert.equal(await getSessionAccountId(firstRequest, sql), 'owner');
+    assert.equal(await getSessionAccountId(secondRequest, sql), 'account-b');
     assert.equal(await revokeSession(firstRequest, sql), true);
     assert.equal(await hasValidSession(firstRequest, sql), false);
     assert.equal(await hasValidSession(secondRequest, sql), true);

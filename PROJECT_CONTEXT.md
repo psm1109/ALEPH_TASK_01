@@ -2,106 +2,61 @@
 
 ## 기준 상태
 
-- 현재 브랜치: `t08/passkey`
-- 작업 시작 기준 커밋: `c7978dd`
-- 커밋 상태: 카드 4 운영 검증 기록과 인계 문서 갱신을 로컬 커밋함
-- 작업 트리: 카드 4 작업 커밋 직후 변경 사항 없음
+- 브랜치: `t08/passkey`; 작업 시작 기준 커밋: `e9739a8206eaae247a070ccbb28366f3db8eef95`.
+- 시작 시 작업 트리에는 기존 변경이 없었습니다. 카드 5 변경은 미커밋·미푸시 상태입니다.
+- 이전 마지막 검사: `npm test` 빌드 및 22개 통과. 이전 운영 기록은 `docs/card2`~`docs/card4`에 있습니다.
+- DB는 Supabase가 아니라 Neon입니다. 카드 5 SQL은 운영에 미적용, 새 코드는 Vercel에 미배포입니다.
 
-## 이번 작업에서 완료한 내용
+## 이번에 완료한 작업
 
-- 운영 Chrome에서 Google 비밀번호 관리자 패스키 인증에 성공하고 비공개 자료 반환을 확인했습니다.
-- 운영 패스키 목록에서 3개 credential과 저장 위치를 확인했습니다. 2개는 `휴대폰 또는 동기화된 패스키 관리자`, 1개는 `이 기기의 Windows Hello 또는 기기 잠금`입니다.
-- 운영 Neon에서 세 credential의 77바이트 COSE 공개키를 읽기 전용으로 확인하고 `docs/card2/README.md`에 기록했습니다. credential ID·쿠키·비밀값은 기록하지 않았습니다.
-- 등록 challenge를 두 번 발급한 뒤 Neon 집계에서 활성 2개·서로 다른 값 2개·5분 만료를 확인했습니다. challenge 원문과 ceremony ID는 기록하지 않았습니다.
-- 운영 등록 취소 전후 패스키 수가 3개로 동일했고, 한국어 “서버에는 패스키가 저장되지 않았습니다.” 안내와 challenge 즉시 폐기를 확인했습니다.
-- 패스키 등록 시 1~40자 이름을 서버에 저장하고, 기존 패스키도 관리 화면에서 이름을 변경할 수 있도록 로컬 구현했습니다.
-- 기존 credential에 이름을 채우는 `db/migrations/20260928_add_passkey_display_name.sql`을 추가했고 운영 Neon에 적용된 상태를 확인했습니다.
-- 취소·포커스 실패 시 한국어 안내를 표시하고 해당 임시 challenge를 즉시 폐기하는 API와 클라이언트 처리를 추가했습니다.
-- 등록 요청·응답의 가린 구조와 T08-C19~C26 판정표를 `docs/card2`에 추가했습니다.
-- 운영 인증 옵션 API를 두 번 호출해 매번 새 challenge가 발급되고 값이 서로 다름을 확인했습니다(원문 대신 해시 앞 12자리만 기록).
-- 운영 Neon에서 credential 3행과 공개키 77바이트, 이름 마이그레이션 적용 및 성공 로그인에 따른 `last_used_at` 갱신을 재확인했습니다.
-- T08-C27~C35 판정표와 로그인 요청 증거 요약을 `docs/card3/README.md`에 추가했습니다.
-- T08-C35를 위해 `/`와 `/setup`의 일회용 설정 코드 입력을 `type="text" autocomplete="one-time-code"`로 변경했습니다.
-- 운영에서 변조 assertion을 보내 `401`, 같은 ceremony ID를 재사용해 `400`을 확인했습니다. 요청의 credential·ceremony 원문은 문서에 기록하지 않았습니다.
-- 로그아웃 뒤 쿠키 없는 운영 요청은 `401`이었지만, 로그아웃 전 쿠키 값을 그대로 재사용하면 현재 stateless HMAC 검증을 통과함을 로컬 재현했습니다. T08-C33은 미통과입니다.
-- 로그인 세션마다 임의 ID를 발급하고 DB에는 SHA-256 해시만 저장하며, 로그아웃 시 현재 세션 행만 삭제하도록 로컬 보완했습니다.
-- 회귀 검사에서 로그아웃한 세션 쿠키 replay는 거절되고 다른 기기 세션은 유지되는 것을 확인했습니다.
-- 운영 Neon에 세션 마이그레이션 적용, Vercel Production `c3eb8da` 배포를 확인했습니다.
-- 운영 패스키 로그인 직후 활성 세션 해시 1개와 비공개 자료 반환을 확인했습니다. 로그아웃 뒤 세션 행은 0개가 됐고 비공개 API는 `401`을 반환해 T08-C33을 통과했습니다.
-- 운영 패스키 관리 화면에서 `내 휴대폰`, `구글 계정 패스키` 두 개의 이름·등록일·최근 사용일을 확인해 T08-C42~C43을 통과했습니다.
-- 사용 기록이 없던 `내 휴대폰`을 삭제하고 남은 `구글 계정 패스키`로 다시 로그인해 비공개 자료 반환을 확인하여 T08-C44를 통과했습니다.
-- 삭제한 이 기기/Windows Hello 패스키는 이후 인증 선택 목록에서 제외되어 선택·로그인할 수 없었고, 취소 뒤 비공개 영역이 잠긴 상태임을 확인해 T08-C45를 통과했습니다.
-- 하나만 남은 목록에서 마지막 패스키 삭제 버튼이 비활성화되고 잠금 방지 안내가 표시되는 것을 확인했습니다. 서버의 트랜잭션 삭제 조건과 `409` 응답 회귀 검사까지 포함해 T08-C46을 통과했습니다.
+- 기존 패스키·세션·자료를 `owner`에 보존하는 계정 분리 SQL을 작성했습니다.
+- 인증 계정에서 새 검증 계정과 별도 WebAuthn user ID·패스키·가상 자료 1건을 만들도록 구성했습니다.
+- 로그인 세션에 계정을 묶고 비공개 자료 및 패스키 관리를 세션 계정으로 제한했습니다. 상대 자료 번호 조회는 `404`, URL·본문의 계정값 변조는 자기 자료만 반환합니다.
+- `docs/card5/README.md`에 설명 여섯 항목과 네 확인의 요청·응답, URL, AI 역할, 미해결 항목을 기록했습니다. 실제 양방향 운영 증거가 없는 상태를 명시했습니다.
+- Chrome 일반 창에서 결과물의 공개 소개 첫 화면과 GitHub의 공개 `t08/passkey` 브랜치를 확인했습니다. 새 시크릿 창은 미확인입니다.
 
 ## 주요 수정 파일
 
-- `api/_lib/passkey-name.js`, `api/passkey/register-verify.js`, `api/passkey/credentials.js`: 패스키 이름 검증·저장·조회·변경
-- `index.html`, `setup/index.html`, `script.js`, `setup.js`, `passkey-client.js`, `styles.css`: 이름 입력·변경 UI와 취소 안내
-- `api/passkey/challenge-cancel.js`, `api/_lib/challenges.js`: 취소된 ceremony challenge 즉시 폐기
-- `db/schema.sql`, `db/migrations/20260928_add_passkey_display_name.sql`: `display_name` 컬럼과 기존 행 이름 채움
-- `tests/private-boundary.test.js`: 이름·취소 보완 회귀 검사
-- `docs/card2/README.md`, `docs/card2/registration-request-shape.json`: 패스키 등록 검증 결과와 등록 본문 구조
-- `docs/card3/README.md`: 패스키 로그인 검증 결과와 T08-C27~C35 증거
-- `docs/card4/README.md`: 복수 패스키 목록, 삭제 전후 로그인과 마지막 패스키 보호에 대한 T08-C42~C46 증거
-- `tests/private-boundary.test.js`: 로그인 challenge·공개키 검증·로그아웃·비밀번호 입력칸 회귀 검사 추가
-- `api/_lib/session.js`, `api/passkey/logout.js`: 세션 ID 해시 저장과 개별 로그아웃 폐기
-- `db/migrations/20260928_restore_revocable_passkey_sessions.sql`: legacy 제거 이후 폐기 가능한 세션 테이블 추가
-- `README.md`: 이름 마이그레이션과 challenge 취소 정책
+- `api/_lib/session.js`, `api/_lib/challenges.js`: 세션·challenge의 계정 식별자.
+- `api/passkey/register-options.js`, `api/passkey/register-verify.js`, `api/passkey/authenticate-verify.js`: 계정별 등록·로그인.
+- `api/private-items.js`, `api/passkey/credentials.js`: 자료·패스키 권한 검사.
+- `passkey-client.js`, `script.js`, `index.html`: 검증 계정 생성 UI.
+- `db/schema.sql`, `db/migrations/20260928_add_passkey_account_isolation.sql`: 계정 열과 기존 행 보존.
+- `tests/private-boundary.test.js`, `docs/card5/README.md`, `README.md`: 검사와 설명.
 
-## 실행한 검사와 실제 결과
+## 실행한 검사와 결과
 
-### 통과한 정적·로컬 검사
+- 최종 변경 후 승인된 권한 환경에서 `npm test`: Vite 프로덕션 빌드, Node 검사 24개 통과·실패 0개.
+- 일반 샌드박스 `npm test`: Vite 하위 프로세스 `spawn EPERM`. 같은 명령은 승인된 환경에서 통과했습니다.
+- `node --check` 20개 JS 파일 통과. `git diff --check`: 오류 없음, Windows CRLF 경고만 있음.
+- 모의 DB에서 A/B 각각 자기 자료 1건, 양방향 상대 자료 `404`, 계정값 변조 후 자기 자료 반환을 확인했습니다. 실제 Neon 결과는 아닙니다.
+- 운영 Chrome 일반 창에서 두 HTTPS URL을 열었습니다. 이번 턴 비공개 API 직접 URL은 브라우저의 `ERR_BLOCKED_BY_CLIENT`, PowerShell은 프록시 연결 거부로 응답 미확인입니다. 로컬 비인증 핸들러는 `401`입니다.
+- 기존 카드 3의 challenge 재사용 `400`, 카드 4의 삭제 후 남은 패스키 로그인은 이전 운영 기록입니다. 카드 5 버전 운영 검증은 미실행입니다.
 
-- `npm test`
-  - Vite 7.3.6 프로덕션 빌드 성공
-  - 기존 학습 이미지 6장 모두 빌드 산출물에 포함됨
-  - Node 테스트 18개 통과, 실패 0개
-  - 기존 401/403, 캐시 금지, 공개 빌드 비공개 자료 미포함, 등록 권한, 세션 설정 검사를 포함
-  - 패스키 이름 1~40자 정규화·저장 경로·목록 반환·이름 변경 경로 확인
-  - 등록 취소 한국어 안내와 challenge 폐기 경로 확인
-- `node --check`를 `api/**/*.js`, `script.js`, `setup.js`, `passkey-client.js`에 실행: 모두 통과
-- `git diff --check`: 오류 없음(CRLF 변환 경고만 있음)
-- `node --test --test-isolation=none tests/private-boundary.test.js`: 20개 통과, 실패 0개. 기본 `npm test`와 격리 기본값은 Vite/Node 하위 프로세스 `spawn EPERM`으로 실행되지 않았습니다.
-- T08-C33 보완 뒤 `npm test`: 프로덕션 빌드 성공, 22개 통과, 실패 0개.
-- 카드 4 문서화 뒤 승인된 권한 환경에서 `npm test`: Vite 프로덕션 빌드 성공, Node 테스트 22개 통과, 실패 0개.
+## 미확인·미해결
 
-### 검사 환경 제한
-
-- 샌드박스 내부 `npm test`는 Vite의 하위 프로세스 실행에서 `spawn EPERM`으로 중단됐고, 승인된 권한 환경에서 동일 명령을 다시 실행해 통과했습니다.
-
-### 운영에서 확인한 상태
-
-- Chrome의 Google 비밀번호 관리자 패스키로 운영 로그인에 성공했습니다.
-- `GET /api/passkey/status`: `200`, `{"registrationAvailable":false}`.
-- 비인증 `GET /api/passkey/credentials`: `401`, `{"error":"패스키 인증이 필요합니다."}`.
-- 인증된 패스키 목록: 3개. Google 비밀번호 관리자/휴대폰 계열 2개, Windows Hello/기기 잠금 계열 1개.
-- 등록 취소 전후 credential 수: 3개로 동일. 운영 화면에서 한국어 취소 안내를 확인했습니다.
-- Neon `passkey_credentials`: 3행 모두 `public_key` 77바이트. 실제 Base64 값은 `docs/card2/README.md`에 기록했습니다.
-- Neon `webauthn_challenges`: 두 등록 요청 후 활성 2행, distinct challenge 2개, 각각 생성 후 약 5분 만료.
-- T08-C33 운영 재검증: 로그인 뒤 `passkey_sessions` 활성 1행(64자 해시), 로그아웃 뒤 0행, 이후 `/api/private-items` `401`.
-- 카드 4 운영 검증: 삭제 전 패스키 2개, `내 휴대폰` 삭제 성공, `구글 계정 패스키` 재로그인 성공, 삭제한 패스키는 인증 선택 목록에서 제외됨.
-- 카드 4 마지막 패스키 보호: 한 개만 남은 목록에서 삭제 버튼 비활성화와 잠금 방지 안내 확인.
-
-## 아직 확인하지 못한 항목
-
-- `db/migrations/20260928_add_passkey_display_name.sql`은 운영 Neon에 적용되어 세 credential의 `display_name`이 채워져 있습니다.
-- 운영 Vercel에 이름·취소 보완이 배포되었고, 운영 화면에서 사람이 붙인 패스키 이름과 한국어 취소 안내를 확인했습니다.
-- 과거 실제 등록 Network 요청 본문은 저장되지 않아 `docs/card2/registration-request-shape.json`은 코드에서 도출한 가림 구조입니다. 다음 신규 등록 시 실제 Network 원문을 캡처해야 합니다.
-- 인증된 패스키 목록 화면은 브라우저에서 확인했지만 저장소 이미지 파일로 저장하지 못했습니다.
-- 카드 4의 삭제 전 2개 목록과 삭제 후 1개 목록은 운영 브라우저에서 캡처해 확인했지만 저장소 이미지 파일로 저장하지 못했습니다.
-- 실제 비공개 개인 내용은 여전히 자리표시자입니다.
+- 운영 Neon 마이그레이션과 Vercel 배포, A/B 두 실제 패스키의 양방향 요청·응답·전후 건수.
+- 두 URL의 새 시크릿 창 무인증 접근과 제출 폼 필드 입력.
+- 공개 본문·이미지·Drive·Notion 외부 링크의 실제 개인정보 여부.
+- 검증 계정 생성 횟수 제한과 모든 기기 패스키 분실 시 자동 복구 부재.
+- 사용자의 직접 판단과 AI 제안 거절 사례는 확인되지 않아 제출문에 꾸며 쓰지 않았습니다.
 
 ## 다음 작업자가 바로 실행할 순서
 
-1. 실제 신규 등록이 필요할 때 DevTools Network의 `/api/passkey/register-options` 및 `/api/passkey/register-verify` 요청·응답을 민감 값 `[가림]` 처리 후 저장합니다.
-2. 카드 4 제출에 이미지 파일이 필수라면 저장소 밖에서 확인한 삭제 전·후 브라우저 화면을 별도 캡처해 `docs/card4`에 추가합니다.
+1. `npm test`와 `git diff --check` 재실행.
+2. Neon에서 기존 credential·세션·자료 행 수를 기록하고 `db/migrations/20260928_add_passkey_account_isolation.sql`을 실행한 뒤 모든 기존 행의 `account_id='owner'`와 행 수 보존을 확인.
+3. 새 코드 배포 후 A 패스키 로그인 → `검증 계정 만들기`로 B 등록 → 각각 로그아웃·재로그인.
+4. 각 계정 자료 번호·건수를 기록하고 양방향 `GET /api/private-items?itemId=<상대 자료 번호>`의 `404`, URL·본문 계정값 변조 후 자기 자료 반환, 전후 건수를 기록.
+5. 새 시크릿 창에서 결과물·소스 URL을 열고 개인정보를 확인한 뒤 `docs/card5/README.md`와 실제 제출 필드에 확인된 결과만 입력.
 
 ## 제안 커밋 메시지
 
 ```text
-docs: 카드 4 패스키 삭제 검증 기록 추가
+feat: 패스키 계정별 비공개 자료 격리 추가
 
-- [Docs] 두 패스키의 이름과 등록일 및 삭제 전후 상태 기록
-- [Test] 남은 패스키 로그인 성공과 삭제한 패스키 사용 불가 기록
-- [Security] 마지막 패스키 삭제 차단과 민감 값 비기록 명시
+- [Feat] 별도 검증 계정 등록과 계정별 세션 발급
+- [Security] 자료 조회와 패스키 관리를 세션 계정으로 제한
+- [DB] 기존 자료 보존용 계정 분리 마이그레이션 추가
+- [Test] 양방향 교차 조회와 계정값 변조 회귀 검사
+- [Docs] 카드 5 확인 기록과 미검증 항목 정리
 ```
