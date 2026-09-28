@@ -242,15 +242,18 @@
               <h3>비공개 기록이 잠겨 있습니다</h3>
               <p>인증 전에는 기록의 제목과 내용 모두 이 페이지에 포함되지 않습니다.</p>
             </div>
-            <button class="passkey-button" type="button" data-passkey-login>패스키로 열기</button>
+            <div class="private-lock-actions">
+              <button class="passkey-button" type="button" data-passkey-login>패스키로 열기</button>
+              <button class="passkey-button" type="button" data-passkey-register>새 사용자 패스키 등록</button>
+            </div>
           </div>
 
           <div class="private-content" data-private-content hidden>
             <div class="private-content-header">
-              <p class="private-status"><span aria-hidden="true">●</span> 패스키 인증됨</p>
+              <p class="private-status"><span aria-hidden="true">●</span> 패스키 인증됨 · <span data-site-user-id></span></p>
               <div class="private-actions">
                 <button class="passkey-add" type="button" data-passkey-add>패스키 추가</button>
-                <button class="passkey-add" type="button" data-passkey-new-account>검증 계정 만들기</button>
+                <button class="passkey-manage" type="button" data-site-user-id-rename>사용자 ID 변경</button>
                 <button class="passkey-manage" type="button" data-passkey-manage>패스키 관리</button>
                 <button class="private-logout" type="button" data-passkey-logout>잠그기</button>
               </div>
@@ -267,13 +270,17 @@
     <dialog class="passkey-bootstrap-dialog" data-passkey-bootstrap-dialog aria-labelledby="passkey-bootstrap-title">
       <form class="passkey-bootstrap-form" data-passkey-bootstrap-form>
         <button class="passkey-dialog-close" type="button" data-passkey-bootstrap-cancel aria-label="닫기">×</button>
-        <p class="private-eyebrow">ONE-TIME OWNER CHECK</p>
-        <h2 id="passkey-bootstrap-title">첫 패스키 등록</h2>
-        <p>최초 소유자 확인 후 Windows가 패스키 저장 위치 선택 창을 바로 엽니다.</p>
+        <p class="private-eyebrow">PASSKEY REGISTRATION</p>
+        <h2 id="passkey-bootstrap-title">패스키 등록</h2>
+        <p>사이트 사용자 ID를 정하고 기기에 패스키를 저장합니다.</p>
+        <label for="bootstrap-site-user-id">사이트 사용자 ID</label>
+        <input id="bootstrap-site-user-id" name="bootstrap-site-user-id" type="text" minlength="3" maxlength="32" pattern="[A-Za-z][A-Za-z0-9_-]{2,31}" autocomplete="username" placeholder="예: testA" required data-passkey-bootstrap-user-id />
         <label for="bootstrap-passkey-name">패스키 이름</label>
         <input id="bootstrap-passkey-name" name="bootstrap-passkey-name" type="text" maxlength="40" autocomplete="off" placeholder="예: 내 노트북 Windows Hello" data-passkey-bootstrap-name />
-        <label for="bootstrap-setup-code">일회용 설정 코드</label>
-        <input id="bootstrap-setup-code" name="bootstrap-setup-code" type="text" autocomplete="one-time-code" data-passkey-bootstrap-code />
+        <div data-passkey-bootstrap-code-group>
+          <label for="bootstrap-setup-code">최초 설정 코드</label>
+          <input id="bootstrap-setup-code" name="bootstrap-setup-code" type="text" autocomplete="one-time-code" data-passkey-bootstrap-code />
+        </div>
         <div class="passkey-dialog-actions">
           <button type="button" data-passkey-bootstrap-cancel>취소</button>
           <button type="submit" data-passkey-bootstrap-submit>패스키 등록 계속</button>

@@ -1,3 +1,11 @@
+CREATE TABLE IF NOT EXISTS passkey_accounts (
+  account_id text PRIMARY KEY,
+  site_user_id text NOT NULL CHECK (site_user_id ~ '^[A-Za-z][A-Za-z0-9_-]{2,31}$')
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS passkey_accounts_site_user_id_idx
+  ON passkey_accounts (lower(site_user_id));
+
 CREATE TABLE IF NOT EXISTS passkey_credentials (
   credential_id text PRIMARY KEY,
   display_name text NOT NULL CHECK (char_length(btrim(display_name)) BETWEEN 1 AND 40),
@@ -54,6 +62,7 @@ CREATE TABLE IF NOT EXISTS webauthn_challenges (
   webauthn_user_id bytea,
   account_id text,
   source_account_id text,
+  site_user_id text,
   expires_at timestamptz NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );

@@ -95,8 +95,11 @@ const privateContent = document.querySelector('[data-private-content]');
 const privateItems = document.querySelector('[data-private-items]');
 const privateMessage = document.querySelector('[data-private-message]');
 const loginButton = document.querySelector('[data-passkey-login]');
+const registerButton = document.querySelector('[data-passkey-register]');
 const logoutButton = document.querySelector('[data-passkey-logout]');
 const addPasskeyButton = document.querySelector('[data-passkey-add]');
+const siteUserIdLabel = document.querySelector('[data-site-user-id]');
+const renameSiteUserIdButton = document.querySelector('[data-site-user-id-rename]');
 const managePasskeysButton = document.querySelector('[data-passkey-manage]');
 const managePasskeysDialog = document.querySelector('[data-passkey-manage-dialog]');
 const managePasskeysList = document.querySelector('[data-passkey-list]');
@@ -105,7 +108,9 @@ const managePasskeysCloseButtons = document.querySelectorAll('[data-passkey-mana
 const bootstrapDialog = document.querySelector('[data-passkey-bootstrap-dialog]');
 const bootstrapForm = document.querySelector('[data-passkey-bootstrap-form]');
 const bootstrapCodeInput = document.querySelector('[data-passkey-bootstrap-code]');
+const bootstrapCodeGroup = document.querySelector('[data-passkey-bootstrap-code-group]');
 const bootstrapNameInput = document.querySelector('[data-passkey-bootstrap-name]');
+const bootstrapUserIdInput = document.querySelector('[data-passkey-bootstrap-user-id]');
 const bootstrapSubmitButton = document.querySelector('[data-passkey-bootstrap-submit]');
 const bootstrapMessage = document.querySelector('[data-passkey-bootstrap-message]');
 const bootstrapCancelButtons = document.querySelectorAll('[data-passkey-bootstrap-cancel]');
@@ -114,6 +119,8 @@ const setPrivateMessage = (message, isError = false) => {
   privateMessage.textContent = message;
   privateMessage.classList.toggle('is-error', isError);
 };
+
+const validSiteUserId = (value) => /^[A-Za-z][A-Za-z0-9_-]{2,31}$/.test(value.trim());
 
 const formatPasskeyDate = (value) => {
   if (!value) return '사용 기록 없음';
@@ -227,12 +234,15 @@ const lockPrivateSpace = () => {
   privateContent.hidden = true;
   privateLock.hidden = false;
   privateItems.replaceChildren();
+  siteUserIdLabel.textContent = '';
 };
 
 const loadPrivateItems = async ({ quiet = false } = {}) => {
   try {
     const { items } = await requestJson('/api/private-items', { method: 'GET' });
     renderPrivateItems(items);
+    const { siteUserId } = await requestJson('/api/passkey/account', { method: 'GET' });
+    siteUserIdLabel.textContent = siteUserId || '사용자 ID 미설정';
     privateLock.hidden = true;
     privateContent.hidden = false;
     privatePanel.dataset.state = 'open';
@@ -250,7 +260,10 @@ const setBootstrapMessage = (message, isError = false) => {
   bootstrapMessage.classList.toggle('is-error', isError);
 };
 
-const openBootstrapDialog = () => {
+let firstRegistration = false;
+const openBootstrapDialog = (isFirst) => {
+  firstRegistration = isFirst;
+  bootstrapCodeGroup.hidden = !isFirst;
   setBootstrapMessage('');
   bootstrapDialog.showModal();
   bootstrapNameInput.focus();
@@ -259,12 +272,14 @@ const openBootstrapDialog = () => {
 bootstrapCancelButtons.forEach((button) => button.addEventListener('click', () => {
   bootstrapCodeInput.value = '';
   bootstrapNameInput.value = '';
+  bootstrapUserIdInput.value = '';
   bootstrapDialog.close();
 }));
 
 bootstrapDialog.addEventListener('close', () => {
   bootstrapCodeInput.value = '';
   bootstrapNameInput.value = '';
+  bootstrapUserIdInput.value = '';
   bootstrapSubmitButton.disabled = false;
 });
 
@@ -272,12 +287,18 @@ bootstrapForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const setupCode = bootstrapCodeInput.value;
   const displayName = bootstrapNameInput.value.trim();
+  const siteUserId = bootstrapUserIdInput.value.trim();
+  if (!validSiteUserId(siteUserId)) {
+    setBootstrapMessage('사용자 ID는 영문자로 시작하는 3~32자의 영문·숫자·_-로 입력해 주세요.', true);
+    bootstrapUserIdInput.focus();
+    return;
+  }
   if (!displayName) {
     setBootstrapMessage('패스키 이름을 입력해 주세요.', true);
     bootstrapNameInput.focus();
     return;
   }
-  if (!setupCode) {
+  if (firstRegistration && !setupCode) {
     setBootstrapMessage('일회용 설정 코드를 입력해 주세요.', true);
     bootstrapCodeInput.focus();
     return;
@@ -286,10 +307,10 @@ bootstrapForm.addEventListener('submit', async (event) => {
   bootstrapSubmitButton.disabled = true;
   setBootstrapMessage('Windows의 패스키 저장 위치 선택 창을 여는 중입니다.');
   try {
-    await runPasskeyCeremony('register', { setupCode, displayName });
+    await runPasskeyCeremony('register', { setupCode: firstRegistration ? setupCode : '', displayName, siteUserId, newAccount: !firstRegistration });
     bootstrapDialog.close();
     await loadPrivateItems();
-    setPrivateMessage('첫 패스키를 등록하고 비공개 기록을 열었습니다.');
+    setPrivateMessage('패스키를 등록하고 내 계정의 기록을 열었습니다.');
   } catch (error) {
     setBootstrapMessage(error.message, true);
   } finally {
@@ -304,7 +325,7 @@ loginButton.addEventListener('click', async () => {
     const { registrationAvailable } = await requestJson('/api/passkey/status', { method: 'GET' });
     if (shouldStartPasskeyRegistration(registrationAvailable)) {
       setPrivateMessage('첫 패스키를 등록해 주세요.');
-      openBootstrapDialog();
+      openBootstrapDialog(true);
       return;
     }
 
@@ -340,23 +361,37 @@ addPasskeyButton.addEventListener('click', async () => {
   }
 });
 
-document.querySelector('[data-passkey-new-account]').addEventListener('click', async (event) => {
-  const button = event.currentTarget;
-  const displayName = window.prompt('새 검증 계정의 패스키 이름을 입력해 주세요.');
-  if (displayName === null) return;
-  if (!displayName.trim() || displayName.trim().length > 40) {
-    setPrivateMessage('패스키 이름을 1~40자로 입력해 주세요.', true);
-    return;
-  }
-  button.disabled = true;
+registerButton.addEventListener('click', async () => {
+  registerButton.disabled = true;
   try {
-    await runPasskeyCeremony('register', { displayName, newAccount: true });
-    await loadPrivateItems();
-    setPrivateMessage('새 검증 계정으로 전환했습니다. 잠근 뒤 각 패스키로 자료를 확인해 주세요.');
+    const { registrationAvailable } = await requestJson('/api/passkey/status', { method: 'GET' });
+    openBootstrapDialog(registrationAvailable);
   } catch (error) {
     setPrivateMessage(error.message, true);
   } finally {
-    button.disabled = false;
+    registerButton.disabled = false;
+  }
+});
+
+renameSiteUserIdButton.addEventListener('click', async () => {
+  const siteUserId = window.prompt('현재 계정의 사이트 사용자 ID를 입력해 주세요.', siteUserIdLabel.textContent);
+  if (siteUserId === null) return;
+  if (!validSiteUserId(siteUserId)) {
+    setPrivateMessage('사용자 ID는 영문자로 시작하는 3~32자의 영문·숫자·_-로 입력해 주세요.', true);
+    return;
+  }
+  renameSiteUserIdButton.disabled = true;
+  try {
+    const result = await requestJson('/api/passkey/account', {
+      method: 'PATCH',
+      body: JSON.stringify({ siteUserId: siteUserId.trim() }),
+    });
+    siteUserIdLabel.textContent = result.siteUserId;
+    setPrivateMessage('사용자 ID를 변경했습니다. 기존 패스키는 그대로 사용할 수 있습니다.');
+  } catch (error) {
+    setPrivateMessage(error.message, true);
+  } finally {
+    renameSiteUserIdButton.disabled = false;
   }
 });
 

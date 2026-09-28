@@ -1,5 +1,6 @@
-export function getRegistrationAccess({ sessionAuthorized, setupAuthorized, hasCredential }) {
+export function getRegistrationAccess({ sessionAuthorized, setupAuthorized, hasCredential, newAccount = false }) {
   if (sessionAuthorized) return { allowed: true, bootstrap: false };
+  if (newAccount && hasCredential) return { allowed: true, bootstrap: false };
   if (!setupAuthorized) {
     return { allowed: false, status: 403, error: '패스키 등록 권한이 없습니다.' };
   }
