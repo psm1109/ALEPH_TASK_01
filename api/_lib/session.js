@@ -1,4 +1,5 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { getSql } from './db.js';
 
 const COOKIE_NAME = '__Host-private_session';
 const SESSION_SECONDS = 60 * 60 * 8;
@@ -9,6 +10,10 @@ export function isSessionConfigured() {
 
 function sign(value, secret) {
   return createHmac('sha256', secret).update(value).digest('base64url');
+}
+
+function hashSessionId(value) {
+  return createHash('sha256').update(value).digest('hex');
 }
 
 function safeEqual(left, right) {
@@ -27,15 +32,54 @@ function getCookies(request) {
   );
 }
 
-export function createSessionCookie() {
+function readSession(request) {
+  const secret = process.env.SESSION_SECRET;
+  const token = getCookies(request)[COOKIE_NAME];
+  if (!secret || !token) return null;
+
+  const tokenParts = token.split('.');
+  if (tokenParts.length !== 2) return null;
+  const [encodedPayload, signature] = tokenParts;
+  if (!encodedPayload || !signature || !safeEqual(signature, sign(encodedPayload, secret))) return null;
+
+  try {
+    const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
+    const expiresAtSeconds = Number(payload.exp);
+    if (
+      payload.sub !== 'owner'
+      || typeof payload.sid !== 'string'
+      || payload.sid.length < 32
+      || !Number.isFinite(expiresAtSeconds)
+      || expiresAtSeconds <= Math.floor(Date.now() / 1000)
+    ) return null;
+    return {
+      sessionIdHash: hashSessionId(payload.sid),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function createSession(sql = null) {
   const secret = process.env.SESSION_SECRET;
   if (!isSessionConfigured()) throw new Error('SESSION_SECRET must be at least 32 characters');
+  const database = sql || getSql();
 
+  const sessionId = randomBytes(32).toString('base64url');
+  const expiresAt = new Date(Date.now() + SESSION_SECONDS * 1000);
   const encodedPayload = Buffer.from(JSON.stringify({
     sub: 'owner',
-    exp: Math.floor(Date.now() / 1000) + SESSION_SECONDS,
+    sid: sessionId,
+    exp: Math.floor(expiresAt.getTime() / 1000),
   })).toString('base64url');
   const token = `${encodedPayload}.${sign(encodedPayload, secret)}`;
+
+  await database`DELETE FROM passkey_sessions WHERE expires_at <= now()`;
+  await database`
+    INSERT INTO passkey_sessions (session_id_hash, expires_at)
+    VALUES (${hashSessionId(sessionId)}, ${expiresAt})
+  `;
+
   return `${COOKIE_NAME}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_SECONDS}`;
 }
 
@@ -43,20 +87,32 @@ export function clearSessionCookie() {
   return `${COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`;
 }
 
-export function hasValidSession(request) {
-  const secret = process.env.SESSION_SECRET;
-  const token = getCookies(request)[COOKIE_NAME];
-  if (!secret || !token) return false;
+export async function hasValidSession(request, sql = null) {
+  const session = readSession(request);
+  if (!session) return false;
 
-  const [encodedPayload, signature] = token.split('.');
-  if (!encodedPayload || !signature || !safeEqual(signature, sign(encodedPayload, secret))) return false;
+  const database = sql || getSql();
+  const rows = await database`
+    SELECT 1
+    FROM passkey_sessions
+    WHERE session_id_hash = ${session.sessionIdHash}
+      AND expires_at > now()
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
 
-  try {
-    const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
-    return payload.sub === 'owner' && Number(payload.exp) > Math.floor(Date.now() / 1000);
-  } catch {
-    return false;
-  }
+export async function revokeSession(request, sql = null) {
+  const session = readSession(request);
+  if (!session) return false;
+
+  const database = sql || getSql();
+  const rows = await database`
+    DELETE FROM passkey_sessions
+    WHERE session_id_hash = ${session.sessionIdHash}
+    RETURNING session_id_hash
+  `;
+  return rows.length > 0;
 }
 
 export function hasSetupAccess(request) {

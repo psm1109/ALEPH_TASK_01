@@ -12,7 +12,7 @@
 | T08-C30 | 운영 통과 | 성공 로그인은 운영 브라우저의 비공개 자료 반환과 Neon `last_used_at` 갱신으로 확인했습니다. 2026-09-28 04:45:42 UTC에는 저장된 credential ID와 의도적으로 깨뜨린 assertion을 보내 `401 {"error":"패스키 인증에 실패했습니다."}`를 확인했습니다. 요청의 credential·ceremony 원문은 기록하지 않았습니다. |
 | T08-C31 | 운영 통과 | 위 실패 검증에서 소비된 동일 ceremony ID를 2026-09-28 04:45:54 UTC에 다시 보냈고 `400 {"error":"인증 요청이 만료되었거나 올바르지 않습니다."}`로 거절됐습니다. |
 | T08-C32 | 코드·운영 구조 통과 | 로그인 뒤 사람을 식별하는 값은 `__Host-private_session` HttpOnly 세션 쿠키입니다. 쿠키 payload의 주체는 `owner`이고 만료는 8시간이며, 비공개 자료 API는 이 쿠키의 HMAC을 검증합니다. 토큰 원문은 기록하지 않았습니다. |
-| T08-C33 | 미통과 | 운영 브라우저 로그아웃 뒤 쿠키가 제거된 상태와 쿠키 없는 직접 요청은 `401 {"error":"패스키 인증이 필요합니다."}`였습니다. 그러나 서버는 세션을 DB에 저장하거나 폐기하지 않고 HMAC·만료만 검사합니다. 동일 쿠키 값을 보존해 로그아웃 뒤 재전송하는 로컬 재현에서는 `beforeLogout: true`, `replayedSameCookieAfterLogout: true`였습니다. 따라서 “같은 값 재사용 거절” 기준은 충족하지 못합니다. |
+| T08-C33 | 운영 미통과, 로컬 보완 완료 | 기존 운영은 쿠키 제거 뒤 요청은 `401`이지만 보존한 동일 쿠키 replay를 서버에서 폐기하지 못했습니다. 로컬에서는 로그인마다 임의 세션 ID를 만들고 DB에는 SHA-256 해시만 저장하며, 로그아웃 시 현재 세션 행만 삭제하도록 보완했습니다. 회귀 검사에서 로그아웃한 쿠키는 `false`, 다른 기기 쿠키는 `true`로 유지됐습니다. DB 마이그레이션·배포 뒤 운영 재검증이 필요합니다. |
 | T08-C34 | 통과 | 이 문서와 제출 자료에는 challenge·ceremony ID·credential ID·쿠키·세션/토큰 원문을 기록하지 않았습니다. 질문은 해시 앞 12자리만 남겼습니다. |
 | T08-C35 | 통과 | 일회용 소유자 코드는 비밀번호가 아니므로 `/`와 `/setup` 모두 일반 텍스트 입력과 `autocomplete="one-time-code"`로 표시합니다. 실제 HTML 입력 요소에는 비밀번호 타입이 없습니다. |
 
@@ -56,9 +56,15 @@ HTTP 401
 beforeLogout: true
 logoutHeader: __Host-private_session=[가림]; Max-Age=0
 replayedSameCookieAfterLogout: true
+
+5. 서버 측 세션 폐기 보완 뒤 로컬 판정
+firstSessionBeforeLogout: true
+firstSessionRevoked: true
+firstSessionReplayAfterLogout: false
+secondDeviceSessionStillValid: true
 ```
 
 ## 아직 남길 자료
 
-- T08-C33을 통과시키려면 서버 측 세션 식별자 저장·폐기 또는 세션 버전 방식으로 로그아웃 전 쿠키 replay를 차단한 뒤 운영에서 다시 검증해야 합니다.
+- `db/migrations/20260928_restore_revocable_passkey_sessions.sql`을 운영 Neon에 적용하고 코드를 배포한 뒤, 로그아웃 전 쿠키 replay가 `401`인지 운영에서 재검증해야 합니다.
 - 실제 신규 등록을 다시 수행할 때 DevTools Network에서 저장한 등록 요청·응답 원문(민감 값은 `[가림]` 처리)

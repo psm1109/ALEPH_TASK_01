@@ -8,6 +8,7 @@ import credentialsHandler from '../api/passkey/credentials.js';
 import { describePasskeyLocation } from '../api/_lib/passkey-metadata.js';
 import { normalizePasskeyName } from '../api/_lib/passkey-name.js';
 import { describePasskeyClientError, shouldStartPasskeyRegistration } from '../passkey-client.js';
+import { clearSessionCookie, createSession, hasValidSession, revokeSession } from '../api/_lib/session.js';
 
 const PRIVATE_MARKERS = [
   '준비 중인 프로젝트 메모',
@@ -248,7 +249,7 @@ test('로그인은 매번 새 challenge를 만들고 저장 공개키로 asserti
   assert.equal(verifySource.includes('expectedChallenge: challenge.challenge'), true);
   assert.equal(verifySource.includes('publicKey: new Uint8Array(stored.public_key)'), true);
   assert.equal(verifySource.includes('if (!verification.verified)'), true);
-  assert.equal(verifySource.includes('createSessionCookie()'), true);
+  assert.equal(verifySource.includes('await createSession(sql)'), true);
   assert.equal(challengeSource.includes('DELETE FROM webauthn_challenges'), true);
 });
 
@@ -258,8 +259,61 @@ test('로그아웃은 세션 쿠키를 지우고 비밀번호 입력칸을 만�
   const setupSource = await readFile(new URL('../setup/index.html', import.meta.url), 'utf8');
 
   assert.equal(logoutSource.includes('clearSessionCookie()'), true);
+  assert.equal(logoutSource.includes('await revokeSession(request)'), true);
   assert.equal(indexSource.includes('type="password"'), false);
   assert.equal(setupSource.includes('type="password"'), false);
   assert.equal(indexSource.includes('autocomplete="one-time-code"'), true);
   assert.equal(setupSource.includes('autocomplete="one-time-code"'), true);
+});
+
+test('로그아웃한 세션만 폐기하고 같은 쿠키 재사용을 거절한다', async () => {
+  const originalSessionSecret = process.env.SESSION_SECRET;
+  process.env.SESSION_SECRET = 'test-only-session-secret-value-1234567890';
+  const storedSessionHashes = new Set();
+  const sql = async (strings, ...values) => {
+    const query = strings.join(' ');
+    if (query.includes('INSERT INTO passkey_sessions')) {
+      storedSessionHashes.add(values[0]);
+      return [];
+    }
+    if (query.includes('SELECT 1') && query.includes('FROM passkey_sessions')) {
+      return storedSessionHashes.has(values[0]) ? [{ exists: 1 }] : [];
+    }
+    if (query.includes('RETURNING session_id_hash')) {
+      const deleted = storedSessionHashes.delete(values[0]);
+      return deleted ? [{ session_id_hash: values[0] }] : [];
+    }
+    if (query.includes('DELETE FROM passkey_sessions WHERE expires_at')) return [];
+    throw new Error(`처리하지 않은 테스트 SQL: ${query}`);
+  };
+
+  try {
+    const firstCookie = (await createSession(sql)).split(';')[0];
+    const secondCookie = (await createSession(sql)).split(';')[0];
+    const firstRequest = { headers: { cookie: firstCookie } };
+    const secondRequest = { headers: { cookie: secondCookie } };
+
+    assert.equal([...storedSessionHashes].every((value) => /^[a-f0-9]{64}$/.test(value)), true);
+    assert.equal(await hasValidSession(firstRequest, sql), true);
+    assert.equal(await hasValidSession(secondRequest, sql), true);
+    assert.equal(await revokeSession(firstRequest, sql), true);
+    assert.equal(await hasValidSession(firstRequest, sql), false);
+    assert.equal(await hasValidSession(secondRequest, sql), true);
+    assert.equal(clearSessionCookie().includes('Max-Age=0'), true);
+  } finally {
+    if (originalSessionSecret === undefined) delete process.env.SESSION_SECRET;
+    else process.env.SESSION_SECRET = originalSessionSecret;
+  }
+});
+
+test('폐기 가능한 세션 테이블은 legacy 제거 뒤 생성한다', async () => {
+  const schemaSource = await readFile(new URL('../db/schema.sql', import.meta.url), 'utf8');
+  const migrationDirectory = new URL('../db/migrations/', import.meta.url);
+  const migrationNames = (await readdir(migrationDirectory)).filter((name) => name.endsWith('.sql')).sort();
+  const removeIndex = migrationNames.indexOf('20260928_remove_legacy_passkey_tables.sql');
+  const restoreIndex = migrationNames.indexOf('20260928_restore_revocable_passkey_sessions.sql');
+
+  assert.equal(schemaSource.includes('CREATE TABLE IF NOT EXISTS passkey_sessions'), true);
+  assert.equal(schemaSource.includes('session_id_hash text PRIMARY KEY'), true);
+  assert.ok(removeIndex >= 0 && restoreIndex > removeIndex);
 });

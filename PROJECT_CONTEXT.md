@@ -3,9 +3,9 @@
 ## 기준 상태
 
 - 현재 브랜치: `t08/passkey`
-- 기준 커밋(현재 HEAD): `12abdf2f81a48e99c1171ad0a239a2ceca2d3051`
-- 커밋 상태: 이번 로그인 검증 보완은 아직 커밋하지 않음
-- 작업 트리: T08-C35를 위해 두 일회용 설정 코드 입력을 `text`로 바꾸고 인증 회귀 검사를 추가한 상태
+- 기준 커밋(현재 HEAD): `47b30b8`
+- 커밋 상태: T08-C33 세션 폐기 보완은 아직 커밋하지 않음
+- 작업 트리: 서버 측 세션 저장·로그아웃 폐기와 관련 문서·검사가 수정·추가된 상태
 
 ## 이번 작업에서 완료한 내용
 
@@ -24,6 +24,8 @@
 - T08-C35를 위해 `/`와 `/setup`의 일회용 설정 코드 입력을 `type="text" autocomplete="one-time-code"`로 변경했습니다.
 - 운영에서 변조 assertion을 보내 `401`, 같은 ceremony ID를 재사용해 `400`을 확인했습니다. 요청의 credential·ceremony 원문은 문서에 기록하지 않았습니다.
 - 로그아웃 뒤 쿠키 없는 운영 요청은 `401`이었지만, 로그아웃 전 쿠키 값을 그대로 재사용하면 현재 stateless HMAC 검증을 통과함을 로컬 재현했습니다. T08-C33은 미통과입니다.
+- 로그인 세션마다 임의 ID를 발급하고 DB에는 SHA-256 해시만 저장하며, 로그아웃 시 현재 세션 행만 삭제하도록 로컬 보완했습니다.
+- 회귀 검사에서 로그아웃한 세션 쿠키 replay는 거절되고 다른 기기 세션은 유지되는 것을 확인했습니다.
 
 ## 주요 수정 파일
 
@@ -35,6 +37,8 @@
 - `docs/card2/README.md`, `docs/card2/registration-request-shape.json`: 패스키 등록 검증 결과와 등록 본문 구조
 - `docs/card3/README.md`: 패스키 로그인 검증 결과와 T08-C27~C35 증거
 - `tests/private-boundary.test.js`: 로그인 challenge·공개키 검증·로그아웃·비밀번호 입력칸 회귀 검사 추가
+- `api/_lib/session.js`, `api/passkey/logout.js`: 세션 ID 해시 저장과 개별 로그아웃 폐기
+- `db/migrations/20260928_restore_revocable_passkey_sessions.sql`: legacy 제거 이후 폐기 가능한 세션 테이블 추가
 - `README.md`: 이름 마이그레이션과 challenge 취소 정책
 
 ## 실행한 검사와 실제 결과
@@ -51,6 +55,7 @@
 - `node --check`를 `api/**/*.js`, `script.js`, `setup.js`, `passkey-client.js`에 실행: 모두 통과
 - `git diff --check`: 오류 없음(CRLF 변환 경고만 있음)
 - `node --test --test-isolation=none tests/private-boundary.test.js`: 20개 통과, 실패 0개. 기본 `npm test`와 격리 기본값은 Vite/Node 하위 프로세스 `spawn EPERM`으로 실행되지 않았습니다.
+- T08-C33 보완 뒤 `npm test`: 프로덕션 빌드 성공, 22개 통과, 실패 0개.
 
 ### 검사 환경 제한
 
@@ -73,22 +78,24 @@
 - 과거 실제 등록 Network 요청 본문은 저장되지 않아 `docs/card2/registration-request-shape.json`은 코드에서 도출한 가림 구조입니다. 다음 신규 등록 시 실제 Network 원문을 캡처해야 합니다.
 - 인증된 패스키 목록 화면은 브라우저에서 확인했지만 저장소 이미지 파일로 저장하지 못했습니다.
 - 실제 비공개 개인 내용은 여전히 자리표시자입니다.
-- T08-C33은 서버 측 세션 폐기 상태가 없어 로그아웃 전 쿠키 replay를 차단하지 못합니다. 정상 브라우저 로그아웃의 쿠키 제거와 `401`만 확인됐습니다.
+- `db/migrations/20260928_restore_revocable_passkey_sessions.sql`은 운영 Neon에 아직 적용하지 않았고 세션 폐기 보완 코드도 배포 전입니다.
+- 운영 배포 뒤 로그아웃 전 쿠키를 보존해 재사용했을 때 `/api/private-items`가 `401`인지 아직 확인하지 않았습니다.
 
 ## 다음 작업자가 바로 실행할 순서
 
-1. T08-C33을 통과시키려면 서버 측 세션 식별자 저장·폐기 또는 세션 버전 방식을 설계하고 로그아웃 시 해당 세션을 무효화합니다.
-2. 구현 뒤 로그아웃 전에 보존한 동일 쿠키를 다시 보내 `/api/private-items`가 `401`인지 운영에서 재검증합니다.
-3. 이번 변경을 배포한 뒤 `/`와 `/setup`에서 일회용 설정 코드 입력이 비밀번호 필드가 아닌지 브라우저에서 확인합니다.
-4. 실제 신규 등록이 필요할 때 DevTools Network의 `/api/passkey/register-options` 및 `/api/passkey/register-verify` 요청·응답을 민감 값 `[가림]` 처리 후 저장합니다.
+1. 코드 배포 전에 `db/migrations/20260928_restore_revocable_passkey_sessions.sql`을 운영 Neon에 적용합니다. 기존 쿠키에는 세션 ID가 없어 배포 후 재로그인이 필요합니다.
+2. 코드를 배포하고 새 패스키 로그인으로 세션을 발급합니다.
+3. 로그아웃 전에 쿠키를 안전하게 보존한 뒤 로그아웃하고, 같은 쿠키로 `/api/private-items`를 호출해 `401`인지 확인합니다. 문서에는 값 원문을 남기지 않습니다.
+4. 다른 기기의 세션이 로그아웃되지 않았는지도 확인합니다.
 
 ## 제안 커밋 메시지
 
 ```text
-fix: 로그인 검증 기록과 일회용 코드 입력 정리
+fix: 로그아웃 세션 재사용 차단
 
-- [Fix] 일회용 소유자 코드 입력을 one-time-code 텍스트 필드로 통일
-- [Test] challenge·공개키 검증·로그아웃 경계 회귀 검사 추가
-- [Docs] 카드 3에 변조 서명과 challenge 재사용 운영 응답 기록
-- [Security] 로그아웃 쿠키 replay 미차단 상태와 후속 조치 명시
+- [Security] 세션 ID 해시를 DB에 저장하고 로그아웃 시 현재 세션 폐기
+- [Fix] 로그아웃 전 쿠키 재사용을 거절하면서 다른 기기 세션 유지
+- [DB] legacy 제거 이후 생성되는 세션 테이블 마이그레이션 추가
+- [Test] 세션 replay 차단과 마이그레이션 순서 회귀 검사 추가
+- [Docs] 카드 3 판정과 운영 배포·재검증 순서 갱신
 ```

@@ -3,7 +3,7 @@ import { consumeChallenge } from '../_lib/challenges.js';
 import { getPasskeyConfig } from '../_lib/config.js';
 import { getSql } from '../_lib/db.js';
 import { logServerError, methodAllowed, readJsonBody, sendJson } from '../_lib/http.js';
-import { createSessionCookie, isSessionConfigured } from '../_lib/session.js';
+import { createSession, isSessionConfigured } from '../_lib/session.js';
 
 export default async function handler(request, response) {
   if (!methodAllowed(request, response, 'POST')) return;
@@ -56,7 +56,7 @@ export default async function handler(request, response) {
       SET counter = ${verification.authenticationInfo.newCounter}, last_used_at = now()
       WHERE credential_id = ${stored.credential_id}
     `;
-    response.setHeader('Set-Cookie', createSessionCookie());
+    response.setHeader('Set-Cookie', await createSession(sql));
     sendJson(response, 200, { verified: true });
   } catch (error) {
     logServerError('authenticate-verify', error);

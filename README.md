@@ -69,13 +69,13 @@ CBOR_NATIVE_ACCELERATION_DISABLED=true
 
 `SESSION_SECRET`이 없거나 32자 미만이면 등록·인증 옵션 API가 `503`을 반환하며 WebAuthn ceremony를 시작하지 않습니다. 모바일에 패스키를 만든 뒤 세션 발급만 실패하는 불완전한 등록을 막기 위한 사전 검사이므로, 반드시 첫 등록 전에 설정하고 재배포해야 합니다.
 
-Neon SQL Editor에서 `db/schema.sql`을 먼저 실행합니다. 이 SQL은 사람이 구분할 수 있는 이름이 붙은 패스키 자격 증명, 5분짜리 일회용 챌린지, 패스키 전용 `passkey_private_items` 테이블을 만들고 세 종류의 자리표시자를 넣습니다. 기존 배포에는 `db/migrations/20260928_add_passkey_display_name.sql`을 먼저 적용해 기존 credential에도 이름을 부여합니다. 실제 프로젝트·지원·회고 내용은 공개 Git 파일이 아닌 이 전용 테이블에서 수정합니다. 기존 `private_items`는 다른 계정 자료와 충돌할 수 있으므로 읽거나 수정하지 않습니다.
+Neon SQL Editor에서 `db/schema.sql`을 먼저 실행합니다. 이 SQL은 사람이 구분할 수 있는 이름이 붙은 패스키 자격 증명, 5분짜리 일회용 챌린지, 폐기 가능한 로그인 세션, 패스키 전용 `passkey_private_items` 테이블을 만들고 세 종류의 자리표시자를 넣습니다. 기존 배포에는 `db/migrations/20260928_add_passkey_display_name.sql`과 `db/migrations/20260928_restore_revocable_passkey_sessions.sql`을 코드 배포 전에 적용합니다. 세션 마이그레이션은 legacy 테이블 제거 파일보다 나중에 실행되도록 이름을 정했습니다. 실제 프로젝트·지원·회고 내용은 공개 Git 파일이 아닌 이 전용 테이블에서 수정합니다. 기존 `private_items`는 다른 계정 자료와 충돌할 수 있으므로 읽거나 수정하지 않습니다.
 
 ```powershell
 npm test
 ```
 
-이 명령은 프로덕션 빌드, 비인증 `401`, 등록 권한 `403`, 최초 설정 코드 재사용 `409`, 추가·관리 기능의 인증 세션 요구, 마지막 패스키 삭제 차단, 응답 캐시 금지, 공개 빌드 내 비공개 문구 부재를 검사합니다.
+이 명령은 프로덕션 빌드, 비인증 `401`, 등록 권한 `403`, 최초 설정 코드 재사용 `409`, 추가·관리 기능의 인증 세션 요구, 로그아웃 세션 재사용 차단, 다른 기기 세션 유지, 마지막 패스키 삭제 차단, 응답 캐시 금지, 공개 빌드 내 비공개 문구 부재를 검사합니다.
 
 ```text
 ALEPH_TASK_01/
@@ -104,6 +104,7 @@ Vercel은 `npm run build`로 `dist/`를 만들고 `api/`를 Node.js 함수(Node 
 ## 비공개 경계 보안
 
 - 인증 쿠키는 JavaScript가 읽을 수 없는 `HttpOnly`, HTTPS 전용 `Secure`, 교차 사이트 전송을 막는 `SameSite=Strict`로 발급합니다.
+- 로그인마다 임의 세션 ID를 발급하고 Neon에는 SHA-256 해시와 만료 시각만 저장합니다. 로그아웃은 현재 세션 행만 삭제하므로 같은 쿠키를 다시 보내도 거절되며 다른 기기 세션은 유지됩니다.
 - 등록·인증 챌린지는 Neon에 저장하고 5분 이내 한 번만 소비합니다.
 - 브라우저에서 등록·인증을 취소하면 해당 일회용 챌린지를 즉시 폐기하고, 등록 취소 시 credential이 저장되지 않았다는 안내를 표시합니다.
 - 사용자 검증을 `required`로 두고 등록된 credential의 서명과 카운터를 SimpleWebAuthn 서버에서 검증합니다.

@@ -13,12 +13,11 @@ function methodAllowed(request, response) {
 
 export default async function handler(request, response) {
   if (!methodAllowed(request, response)) return;
-  if (!hasValidSession(request)) {
-    sendJson(response, 401, { error: '패스키 인증이 필요합니다.' });
-    return;
-  }
-
   try {
+    if (!await hasValidSession(request)) {
+      sendJson(response, 401, { error: '패스키 인증이 필요합니다.' });
+      return;
+    }
     const sql = getSql();
 
     if (request.method === 'GET') {

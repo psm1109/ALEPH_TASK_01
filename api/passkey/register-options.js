@@ -8,19 +8,19 @@ import { hasSetupAccess, hasValidSession, isSessionConfigured } from '../_lib/se
 
 export default async function handler(request, response) {
   if (!methodAllowed(request, response, 'POST')) return;
-  const sessionAuthorized = hasValidSession(request);
-  const setupAuthorized = hasSetupAccess(request);
-  const initialAccess = getRegistrationAccess({ sessionAuthorized, setupAuthorized, hasCredential: false });
-  if (!initialAccess.allowed) {
-    sendJson(response, initialAccess.status, { error: initialAccess.error });
-    return;
-  }
-  if (!isSessionConfigured()) {
-    sendJson(response, 503, { error: '서버 세션 설정이 완료되지 않았습니다.' });
-    return;
-  }
-
   try {
+    const sessionAuthorized = await hasValidSession(request);
+    const setupAuthorized = hasSetupAccess(request);
+    const initialAccess = getRegistrationAccess({ sessionAuthorized, setupAuthorized, hasCredential: false });
+    if (!initialAccess.allowed) {
+      sendJson(response, initialAccess.status, { error: initialAccess.error });
+      return;
+    }
+    if (!isSessionConfigured()) {
+      sendJson(response, 503, { error: '서버 세션 설정이 완료되지 않았습니다.' });
+      return;
+    }
+
     const sql = getSql();
     const config = getPasskeyConfig();
     const credentials = await sql`

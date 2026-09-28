@@ -5,23 +5,23 @@ import { getSql } from '../_lib/db.js';
 import { logServerError, methodAllowed, readJsonBody, sendJson } from '../_lib/http.js';
 import { normalizePasskeyName } from '../_lib/passkey-name.js';
 import { getRegistrationAccess } from '../_lib/registration-access.js';
-import { createSessionCookie, hasSetupAccess, hasValidSession, isSessionConfigured } from '../_lib/session.js';
+import { createSession, hasSetupAccess, hasValidSession, isSessionConfigured } from '../_lib/session.js';
 
 export default async function handler(request, response) {
   if (!methodAllowed(request, response, 'POST')) return;
-  const sessionAuthorized = hasValidSession(request);
-  const setupAuthorized = hasSetupAccess(request);
-  const initialAccess = getRegistrationAccess({ sessionAuthorized, setupAuthorized, hasCredential: false });
-  if (!initialAccess.allowed) {
-    sendJson(response, initialAccess.status, { error: initialAccess.error });
-    return;
-  }
-  if (!isSessionConfigured()) {
-    sendJson(response, 503, { error: '서버 세션 설정이 완료되지 않았습니다.' });
-    return;
-  }
-
   try {
+    const sessionAuthorized = await hasValidSession(request);
+    const setupAuthorized = hasSetupAccess(request);
+    const initialAccess = getRegistrationAccess({ sessionAuthorized, setupAuthorized, hasCredential: false });
+    if (!initialAccess.allowed) {
+      sendJson(response, initialAccess.status, { error: initialAccess.error });
+      return;
+    }
+    if (!isSessionConfigured()) {
+      sendJson(response, 503, { error: '서버 세션 설정이 완료되지 않았습니다.' });
+      return;
+    }
+
     const sql = getSql();
     const existing = await sql`SELECT 1 FROM passkey_credentials LIMIT 1`;
     const registrationAccess = getRegistrationAccess({
@@ -70,7 +70,7 @@ export default async function handler(request, response) {
         ${credentialBackedUp}, ${challenge.webauthn_user_id}, ${registrationAccess.bootstrap}
       )
     `;
-    response.setHeader('Set-Cookie', createSessionCookie());
+    response.setHeader('Set-Cookie', await createSession(sql));
     sendJson(response, 200, { verified: true });
   } catch (error) {
     logServerError('register-verify', error);

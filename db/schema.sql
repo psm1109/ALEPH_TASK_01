@@ -58,6 +58,15 @@ CREATE TABLE IF NOT EXISTS webauthn_challenges (
 CREATE INDEX IF NOT EXISTS webauthn_challenges_expires_at_idx
   ON webauthn_challenges (expires_at);
 
+CREATE TABLE IF NOT EXISTS passkey_sessions (
+  session_id_hash text PRIMARY KEY,
+  expires_at timestamptz NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS passkey_sessions_expires_at_idx
+  ON passkey_sessions (expires_at);
+
 CREATE TABLE IF NOT EXISTS passkey_private_items (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   category text NOT NULL,
