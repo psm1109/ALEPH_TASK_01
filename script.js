@@ -95,7 +95,6 @@ const privateContent = document.querySelector('[data-private-content]');
 const privateItems = document.querySelector('[data-private-items]');
 const privateMessage = document.querySelector('[data-private-message]');
 const loginButton = document.querySelector('[data-passkey-login]');
-const registerButton = document.querySelector('[data-passkey-register]');
 const logoutButton = document.querySelector('[data-passkey-logout]');
 const addPasskeyButton = document.querySelector('[data-passkey-add]');
 const siteUserIdLabel = document.querySelector('[data-site-user-id]');
@@ -340,6 +339,13 @@ loginButton.addEventListener('click', async () => {
 });
 
 addPasskeyButton.addEventListener('click', async () => {
+  const siteUserId = window.prompt('등록할 사이트 사용자 ID를 입력해 주세요.\n현재 계정에 추가하려면 현재 ID를 그대로 사용하세요.', siteUserIdLabel.textContent);
+  if (siteUserId === null) return;
+  if (!validSiteUserId(siteUserId)) {
+    setPrivateMessage('사용자 ID는 영문자로 시작하는 3~32자의 영문·숫자·_-로 입력해 주세요.', true);
+    return;
+  }
+  const newAccount = siteUserId.trim().toLowerCase() !== siteUserIdLabel.textContent.toLowerCase();
   const displayName = window.prompt('이 패스키를 알아볼 수 있는 이름을 입력해 주세요.\n예: 회사 노트북 Windows Hello');
   if (displayName === null) {
     setPrivateMessage('패스키 추가를 취소했습니다.');
@@ -352,24 +358,13 @@ addPasskeyButton.addEventListener('click', async () => {
   addPasskeyButton.disabled = true;
   setPrivateMessage('새 패스키를 등록하고 있습니다.');
   try {
-    await runPasskeyCeremony('register', { displayName });
-    setPrivateMessage('새 패스키를 추가했습니다.');
+    await runPasskeyCeremony('register', { displayName, siteUserId: siteUserId.trim(), newAccount });
+    if (newAccount) await loadPrivateItems();
+    setPrivateMessage(newAccount ? '새 사용자 패스키를 등록하고 계정을 전환했습니다.' : '현재 계정에 패스키를 추가했습니다.');
   } catch (error) {
     setPrivateMessage(error.message, true);
   } finally {
     addPasskeyButton.disabled = false;
-  }
-});
-
-registerButton.addEventListener('click', async () => {
-  registerButton.disabled = true;
-  try {
-    const { registrationAvailable } = await requestJson('/api/passkey/status', { method: 'GET' });
-    openBootstrapDialog(registrationAvailable);
-  } catch (error) {
-    setPrivateMessage(error.message, true);
-  } finally {
-    registerButton.disabled = false;
   }
 });
 

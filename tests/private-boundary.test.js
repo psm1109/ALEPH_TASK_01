@@ -53,12 +53,13 @@ test('비인증 비공개 자료 요청은 DB 환경변수 없이도 401로 거�
 });
 
 test('권한 없는 패스키 등록 요청은 DB 접속 전에 403으로 거절한다', async () => {
-  const request = { method: 'POST', headers: {} };
-  const response = createResponse();
-  await registerOptionsHandler(request, response);
-
-  assert.equal(response.statusCode, 403);
-  assert.deepEqual(JSON.parse(response.body), { error: '패스키 등록 권한이 없습니다.' });
+  for (const body of [{}, { newAccount: true, siteUserId: 'testB' }]) {
+    const request = { method: 'POST', headers: {}, body };
+    const response = createResponse();
+    await registerOptionsHandler(request, response);
+    assert.equal(response.statusCode, 403);
+    assert.deepEqual(JSON.parse(response.body), { error: '패스키 등록 권한이 없습니다.' });
+  }
 });
 
 test('세션 비밀값이 없으면 credential 생성 전에 503으로 중단한다', async () => {
@@ -111,7 +112,7 @@ test('패스키 자료는 기존 계정 자료와 분리된 전용 테이블에�
   assert.equal(schemaSource.includes('CREATE TABLE IF NOT EXISTS passkey_private_items'), true);
 });
 
-test('공개 잠금 패널의 새 사용자 등록은 같은 페이지 등록 대화상자로 이어진다', async () => {
+test('첫 등록은 잠금 화면 또는 setup의 소유자 확인 대화상자로 이어진다', async () => {
   const source = await readFile(new URL('../index.html', import.meta.url), 'utf8');
   const setupSource = await readFile(new URL('../setup/index.html', import.meta.url), 'utf8');
   const privateSection = source.match(/<section class="private-section[\s\S]*?<\/section>/)?.[0];
@@ -121,11 +122,12 @@ test('공개 잠금 패널의 새 사용자 등록은 같은 페이지 등록 �
   assert.equal(privateSection.includes('data-first-passkey-setup'), false);
   assert.equal(privateSection.includes('href="/setup"'), false);
   assert.equal(source.includes('data-passkey-bootstrap-dialog'), true);
-  assert.equal(source.includes('data-passkey-register'), true);
+  assert.equal(source.includes('data-passkey-register'), false);
   assert.equal(source.includes('data-passkey-bootstrap-code'), true);
   assert.equal(source.includes('data-passkey-manage'), true);
   assert.equal(source.includes('data-passkey-manage-dialog'), true);
   assert.equal(setupSource.includes('data-setup-code'), true);
+  assert.equal(setupSource.includes('data-setup-user-id'), true);
   assert.equal(setupSource.includes('일회용 설정 코드'), true);
 });
 
@@ -181,12 +183,12 @@ test('사이트 사용자 ID는 구분 가능한 형식만 허용한다', () => 
   }
 });
 
-test('최초 등록 뒤에는 새 계정 등록을 허용하지만 기존 계정 추가는 인증을 요구한다', () => {
-  assert.deepEqual(getRegistrationAccess({ sessionAuthorized: false, setupAuthorized: false, hasCredential: true, newAccount: true }),
+test('새 계정과 기존 계정의 추가 패스키 등록은 모두 인증을 요구한다', () => {
+  assert.deepEqual(getRegistrationAccess({ sessionAuthorized: true, setupAuthorized: false, hasCredential: true }),
     { allowed: true, bootstrap: false });
   assert.deepEqual(getRegistrationAccess({ sessionAuthorized: false, setupAuthorized: false, hasCredential: true }),
     { allowed: false, status: 403, error: '패스키 등록 권한이 없습니다.' });
-  assert.deepEqual(getRegistrationAccess({ sessionAuthorized: false, setupAuthorized: false, hasCredential: false, newAccount: true }),
+  assert.deepEqual(getRegistrationAccess({ sessionAuthorized: false, setupAuthorized: false, hasCredential: false }),
     { allowed: false, status: 403, error: '패스키 등록 권한이 없습니다.' });
 });
 

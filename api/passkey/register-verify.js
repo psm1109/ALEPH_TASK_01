@@ -32,11 +32,14 @@ export default async function handler(request, response) {
       return;
     }
     const newAccount = Boolean(challenge.site_user_id && challenge.account_id !== 'owner' && challenge.account_id !== sessionAccountId);
+    if (newAccount && existing.length === 0) {
+      sendJson(response, 409, { error: '첫 패스키를 먼저 등록해 주세요.' });
+      return;
+    }
     const registrationAccess = getRegistrationAccess({
       sessionAuthorized,
       setupAuthorized,
       hasCredential: existing.length > 0,
-      newAccount,
     });
     if (!registrationAccess.allowed) {
       sendJson(response, registrationAccess.status, { error: registrationAccess.error });

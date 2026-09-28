@@ -17,7 +17,7 @@ export default async function handler(request, response) {
     const sessionAuthorized = Boolean(sessionAccountId);
     const setupAuthorized = hasSetupAccess(request);
     const initialAccess = getRegistrationAccess({ sessionAuthorized, setupAuthorized, hasCredential: false });
-    if (!newAccount && !initialAccess.allowed) {
+    if (!initialAccess.allowed) {
       sendJson(response, initialAccess.status, { error: initialAccess.error });
       return;
     }
@@ -34,11 +34,14 @@ export default async function handler(request, response) {
       FROM passkey_credentials WHERE account_id = ${accountId} ORDER BY created_at ASC
     `;
     const anyCredential = await sql`SELECT 1 FROM passkey_credentials LIMIT 1`;
+    if (newAccount && anyCredential.length === 0) {
+      sendJson(response, 409, { error: '첫 패스키를 먼저 등록해 주세요.' });
+      return;
+    }
     const registrationAccess = getRegistrationAccess({
       sessionAuthorized,
       setupAuthorized,
       hasCredential: anyCredential.length > 0,
-      newAccount,
     });
     if (!registrationAccess.allowed) {
       sendJson(response, registrationAccess.status, { error: registrationAccess.error });

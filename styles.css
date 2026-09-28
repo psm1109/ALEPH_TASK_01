@@ -87,8 +87,6 @@ button { font:inherit; cursor:pointer; }
 .private-eyebrow { grid-column:1/-1; margin-bottom:6px; color:#9d507b; font:700 .78rem/1.3 Consolas,"Courier New",monospace; letter-spacing:.14em; }
 .private-panel { padding:clamp(22px,4vw,42px); border:1px solid #d8c6d2; border-radius:22px; background:linear-gradient(135deg,#2b2530,#17263c); color:#fff; box-shadow:0 18px 45px #17263c20; }
 .private-lock { min-height:180px; display:grid; grid-template-columns:1fr auto; gap:24px; align-items:center; }
-.private-lock-actions { display:flex; flex-wrap:wrap; gap:10px; justify-content:flex-end; }
-@media (max-width:720px) { .private-lock { grid-template-columns:1fr; }.private-lock-actions { justify-content:flex-start; } }
 .private-lock[hidden] { display:none; }
 .private-lock h3 { margin-bottom:8px; font-size:clamp(1.4rem,2.2vw,2rem); }
 .private-lock p { margin:0; color:#d8d5df; word-break:keep-all; }

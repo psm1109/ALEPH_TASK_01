@@ -5,6 +5,7 @@ const setupForm = document.querySelector('[data-setup-form]');
 const setupComplete = document.querySelector('[data-setup-complete]');
 const setupCodeInput = document.querySelector('[data-setup-code]');
 const setupNameInput = document.querySelector('[data-setup-name]');
+const setupUserIdInput = document.querySelector('[data-setup-user-id]');
 const setupRegisterButton = document.querySelector('[data-setup-register]');
 const setupMessage = document.querySelector('[data-setup-message]');
 
@@ -31,6 +32,12 @@ const loadSetupStatus = async () => {
 setupRegisterButton.addEventListener('click', async () => {
   const setupCode = setupCodeInput.value;
   const displayName = setupNameInput.value.trim();
+  const siteUserId = setupUserIdInput.value.trim();
+  if (!/^[A-Za-z][A-Za-z0-9_-]{2,31}$/.test(siteUserId)) {
+    setSetupMessage('사용자 ID는 영문자로 시작하는 3~32자의 영문·숫자·_-로 입력해 주세요.', true);
+    setupUserIdInput.focus();
+    return;
+  }
   if (!displayName) {
     setSetupMessage('패스키 이름을 입력해 주세요.', true);
     setupNameInput.focus();
@@ -45,9 +52,10 @@ setupRegisterButton.addEventListener('click', async () => {
   setupRegisterButton.disabled = true;
   setSetupMessage('기기에서 패스키 저장 위치를 선택해 주세요.');
   try {
-    await runPasskeyCeremony('register', { setupCode, displayName });
+    await runPasskeyCeremony('register', { setupCode, displayName, siteUserId });
     setupCodeInput.value = '';
     setupNameInput.value = '';
+    setupUserIdInput.value = '';
     showSetupComplete();
     setSetupMessage('패스키 등록을 완료했습니다.');
   } catch (error) {
