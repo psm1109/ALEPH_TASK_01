@@ -236,3 +236,30 @@ test('패스키 관리 화면은 마지막 credential 삭제를 서버에서 차
   assert.equal(source.includes('SELECT credential_id FROM passkey_credentials FOR UPDATE'), true);
   assert.equal(source.includes('마지막 패스키는 삭제할 수 없습니다.'), true);
 });
+
+test('로그인은 매번 새 challenge를 만들고 저장 공개키로 assertion을 검증한다', async () => {
+  const optionsSource = await readFile(new URL('../api/passkey/authenticate-options.js', import.meta.url), 'utf8');
+  const verifySource = await readFile(new URL('../api/passkey/authenticate-verify.js', import.meta.url), 'utf8');
+  const challengeSource = await readFile(new URL('../api/_lib/challenges.js', import.meta.url), 'utf8');
+
+  assert.equal(optionsSource.includes('generateAuthenticationOptions'), true);
+  assert.equal(optionsSource.includes("saveChallenge('authentication', options.challenge)"), true);
+  assert.equal(verifySource.includes("consumeChallenge(ceremonyId, 'authentication')"), true);
+  assert.equal(verifySource.includes('expectedChallenge: challenge.challenge'), true);
+  assert.equal(verifySource.includes('publicKey: new Uint8Array(stored.public_key)'), true);
+  assert.equal(verifySource.includes('if (!verification.verified)'), true);
+  assert.equal(verifySource.includes('createSessionCookie()'), true);
+  assert.equal(challengeSource.includes('DELETE FROM webauthn_challenges'), true);
+});
+
+test('로그아웃은 세션 쿠키를 지우고 비밀번호 입력칸을 만들지 않는다', async () => {
+  const logoutSource = await readFile(new URL('../api/passkey/logout.js', import.meta.url), 'utf8');
+  const indexSource = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const setupSource = await readFile(new URL('../setup/index.html', import.meta.url), 'utf8');
+
+  assert.equal(logoutSource.includes('clearSessionCookie()'), true);
+  assert.equal(indexSource.includes('type="password"'), false);
+  assert.equal(setupSource.includes('type="password"'), false);
+  assert.equal(indexSource.includes('autocomplete="one-time-code"'), true);
+  assert.equal(setupSource.includes('autocomplete="one-time-code"'), true);
+});
